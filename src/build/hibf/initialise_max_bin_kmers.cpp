@@ -36,9 +36,10 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
     {
         // we assume that the max record is at the beginning of the list of remaining records.
         auto const & record = node_data.remaining_records[0];
-        compute_kmers(kmers, arguments, record);
-        update_user_bins(data, filename_indices, record);
-
+        if (record.filenames[0] != "empty_bin"){
+            compute_kmers(kmers, arguments, record);
+            update_user_bins(data, filename_indices, record);
+        }
         return record.number_of_bins.back();
     }
 }

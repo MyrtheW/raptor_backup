@@ -46,11 +46,13 @@ set (BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable (raptor_xxhash_project)
 
 # Shared interface
-if (NOT TARGET raptor_interface)
-    add_library ("raptor_interface" INTERFACE)
-    target_link_libraries ("raptor_interface" INTERFACE raptor::raptor)
-    target_compile_options ("raptor_interface" INTERFACE "-pedantic" "-Wall" "-Wextra")
-endif ()
+add_library ("raptor_interface" INTERFACE)
+target_link_libraries ("raptor_interface" INTERFACE seqan3::seqan3 chopper_lib)
+target_include_directories ("raptor_interface" INTERFACE ../include)
+target_include_directories ("raptor_interface" SYSTEM INTERFACE ${RAPTOR_SUBMODULES_DIR}/chopper/include)
+target_include_directories ("raptor_interface" SYSTEM INTERFACE ${RAPTOR_SUBMODULES_DIR}/robin-hood-hashing/src/include)
+target_compile_options ("raptor_interface" INTERFACE "-pedantic" "-Wall" "-Wextra")
+add_dependencies (raptor_interface chopper_lib)
 
 # Raptor library
 if (NOT TARGET raptor_lib)
@@ -61,10 +63,16 @@ if (NOT TARGET raptor_lib)
 endif ()
 
 # Raptor executable
-if (NOT TARGET raptor)
-    add_executable ("raptor" raptor.cpp)
-    target_link_libraries ("raptor" PUBLIC "raptor_lib")
+add_executable ("raptor" raptor.cpp)
+target_link_libraries ("raptor" PUBLIC "raptor_lib")
+
+install (TARGETS raptor DESTINATION bin)
+if (NOT CMAKE_VERSION VERSION_LESS 3.21) # cmake >= 3.21
+    install (IMPORTED_RUNTIME_ARTIFACTS chopper DESTINATION bin)
+else ()
+    install (PROGRAMS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/chopper" DESTINATION bin)
 endif ()
+
 
 install (TARGETS raptor DESTINATION "${CMAKE_INSTALL_BINDIR}")
 

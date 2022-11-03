@@ -146,8 +146,7 @@ public:
      * \tparam archive_t Type of `archive`; must satisfy seqan3::cereal_archive.
      * \param[in] archive The archive being serialised from/to.
      *
-     * \attention These functions are never called directly.
-     * \sa https://docs.seqan.de/seqan/3.2.0/group__io.html#serialisation
+     * \attention These functions are never called directly, see \ref serialisation for more details.
      */
     template <seqan3::cereal_archive archive_t>
     void CEREAL_SERIALIZE_FUNCTION_NAME(archive_t & archive)
@@ -186,8 +185,7 @@ public:
      * \param[in] archive The archive being serialised from/to.
      * \param[in] version Index version.
      *
-     * \attention These functions are never called directly.
-     * \sa https://docs.seqan.de/seqan/3.2.0/group__io.html#serialisation
+     * \attention These functions are never called directly, see \ref serialisation for more details.
      */
     template <seqan3::cereal_input_archive archive_t>
     void load_parameters(archive_t & archive)
@@ -218,5 +216,6 @@ public:
     }
     //!\endcond
 };
+
 
 } // namespace raptor

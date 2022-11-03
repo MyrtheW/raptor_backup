@@ -10,10 +10,16 @@
 #include <chrono>
 
 #include <raptor/argument_parsing/search_arguments.hpp>
+#include <raptor/argument_parsing/upgrade_arguments.hpp>
 #include <raptor/index.hpp>
 
 namespace raptor
 {
+template <typename index_t>
+void load_index(index_t & index, upgrade_arguments const & arguments, double & index_io_time)
+{
+    load_index(index, arguments.in_file, index_io_time);
+}
 
 template <typename index_t>
 void load_index(index_t & index, search_arguments const & arguments, size_t const part, double & index_io_time)

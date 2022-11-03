@@ -17,8 +17,6 @@ namespace raptor
 void init_upgrade_parser(sharg::parser & parser, upgrade_arguments & arguments)
 {
     init_shared_meta(parser);
-    parser.info.description.emplace_back("Upgrades a Raptor index created with an older version of Raptor to be"
-                                         " compatible with the currently used version of Raptor.");
 
     parser.add_option(arguments.bin_file,
                       sharg::config{.short_id = '\0',
@@ -55,6 +53,10 @@ void init_upgrade_parser(sharg::parser & parser, upgrade_arguments & arguments)
     parser.add_flag(
         arguments.compressed,
         sharg::config{.short_id = '\0', .long_id = "compressed", .description = "Original index was compressed."});
+
+    parser.add_flag(
+        arguments.is_hibf,
+        sharg::config{.short_id = '\0', .long_id = "hibf", .description = "Index is an HIBF.", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
 }
 
 void upgrade_parsing(sharg::parser & parser)

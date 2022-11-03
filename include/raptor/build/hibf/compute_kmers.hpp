@@ -11,12 +11,17 @@
 
 #include <raptor/argument_parsing/build_arguments.hpp>
 #include <raptor/build/hibf/chopper_pack_record.hpp>
+#include <raptor/argument_parsing/upgrade_arguments.hpp> //Myrthe 14.10
 
 namespace raptor::hibf
 {
-
+template <typename arguments_t> //Myrthe 14.10
 void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
-                   build_arguments const & arguments,
+                   arguments_t const & arguments,
                    chopper_pack_record const & record);
 
+template <typename arguments_t> //Myrthe 24.10
+void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
+                   arguments_t const & arguments,
+                   std::vector<std::string> const & filenames); //remove const?
 } // namespace raptor::hibf

@@ -20,7 +20,6 @@ namespace raptor
 void init_search_parser(sharg::parser & parser, search_arguments & arguments)
 {
     init_shared_meta(parser);
-    parser.info.description.emplace_back("Searches a Raptor index using one or more sequences queries.");
     parser.info.examples = {
         "raptor search --error 2 --index raptor.index --query queries.fastq --output search.output"};
 

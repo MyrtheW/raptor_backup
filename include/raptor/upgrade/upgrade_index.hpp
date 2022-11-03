@@ -14,10 +14,9 @@ namespace raptor
 {
 
 template <bool compressed>
-void upgrade_index(upgrade_arguments const & arguments)
+void upgrade_index(upgrade_arguments const & arguments)   // Question Myrthe: what happens if I use an HIBF index here?
 {
-    constexpr seqan3::data_layout layout =
-        compressed ? seqan3::data_layout::compressed : seqan3::data_layout::uncompressed;
+    constexpr seqan3::data_layout layout = compressed ? seqan3::data_layout::compressed : seqan3::data_layout::uncompressed;
     seqan3::interleaved_bloom_filter<layout> original_index{};
 
     if (arguments.parts == 1u)
