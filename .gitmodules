@@ -30,7 +30,7 @@
 	fetchRecurseSubmodules = false
 [submodule "lib/chopper"]
 	path = lib/chopper
-	url = https://github.com/seqan/chopper.git
+	url = https://github.com/MyrtheW/chopper.git
 	branch = master
 	shallow = true
 	fetchRecurseSubmodules = false
