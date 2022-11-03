@@ -22,12 +22,14 @@ struct upgrade_arguments
     seqan3::shape shape{};
     uint8_t parts{1u};
     bool compressed{false};
+    bool is_hibf{false};
 
     std::filesystem::path bin_file{};
     std::filesystem::path in_file{};
     std::filesystem::path out_file{};
 
     std::vector<std::vector<std::string>> bin_path{};
+    bool is_minimiser{false}; //Myrthe 14.10
 };
 
 } // namespace raptor

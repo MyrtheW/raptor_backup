@@ -7,16 +7,24 @@
 
 #include <raptor/upgrade/upgrade.hpp>
 #include <raptor/upgrade/upgrade_index.hpp>
+#include <raptor/upgrade/load_hibf.hpp>
 
 namespace raptor
 {
 
 void raptor_upgrade(upgrade_arguments const & arguments)
-{
-    if (arguments.compressed)
-        upgrade_index<true>(arguments);
-    else
-        upgrade_index<false>(arguments);
+{    if (arguments.is_hibf)
+    { std::cout<<"test";
+        if (arguments.compressed)
+            load_hibf<true>(arguments);
+        else
+            load_hibf<false>(arguments);
+    }else{
+        if (arguments.compressed)
+            upgrade_index<true>(arguments);
+        else
+            upgrade_index<false>(arguments);
+    }
     return;
 }
 

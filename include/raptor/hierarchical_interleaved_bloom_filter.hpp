@@ -121,6 +121,9 @@ public:
      */
     std::vector<std::vector<int64_t>> next_ibf_id;
 
+    // Myrthe.
+    std::vector<std::tuple<int64_t, int64_t>> previous_ibf_id;
+
     //!\brief The underlying user bins.
     user_bins user_bins;
 
@@ -128,6 +131,23 @@ public:
     membership_agent membership_agent() const
     {
         return typename hierarchical_interleaved_bloom_filter<data_layout_mode>::membership_agent{*this};
+    }
+
+    void initialize_previous_ibf_id()
+    {    //higher_ibf_id[ibf_idx] --> (higher_ibf_idx, bin_idx) . If higher_ibf_idx = std::vector<ibf_t>.size(), it does not exist .
+        // size is het zelfde als ibf_vector
+                // dit moet ook geinitializeerd worden, bij traversing IBF, en dan naar lagere te gaan.
+        // loop over next_ibf_id --> werkt niet, want dan weet je niet waar de laagste vandaan komen. Of kan het wel ? next_ibf_id[ibf_id_high][bin_id_high]=[ibf_id_low]
+        // traverse HIBF. [ibf_id
+        auto number_ibfs = ibf_vector.size();
+        previous_ibf_id.resize(ibf_vector.size());
+        std::fill(previous_ibf_id.begin(), previous_ibf_id.end(), std::make_tuple(number_ibfs,0));
+        for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ibf_id_high++){
+            for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); bin_idx++){
+                auto ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
+                previous_ibf_id[ibf_id_low] = std::make_tuple(ibf_id_high, bin_idx);
+            }
+        }
     }
 
 #if RAPTOR_HIBF_HAS_COUNT
@@ -146,8 +166,7 @@ public:
      * \tparam archive_t Type of `archive`; must satisfy seqan3::cereal_archive.
      * \param[in] archive The archive being serialised from/to.
      *
-     * \attention These functions are never called directly.
-     * \sa https://docs.seqan.de/seqan/3.2.0/group__io.html#serialisation
+     * \attention These functions are never called directly, see \ref serialisation for more details.
      */
     template <seqan3::cereal_archive archive_t>
     void CEREAL_SERIALIZE_FUNCTION_NAME(archive_t & archive)
@@ -176,7 +195,75 @@ private:
      */
     std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};
 
+    //!\brief Maps filenames to their indices isn the list of filenames
+    std::unordered_map<std::string, uint64_t> filename_to_idx;     //filename --> filename_index
+
+
+    /*!\brief Stores for each filename ID each of its bins and corresponding IBF in the HIBF
+     * \details
+     * .
+     */
+    std::vector<std::tuple<uint64_t, uint64_t, uint16_t>> filename_position_to_ibf_bin{}; // filename index --> (ibf_idx, bin_idx, number_of_bins)
 public:
+    //!\brief Creates
+    void initialize_filename_position_to_ibf_bin()
+    {
+        filename_position_to_ibf_bin.resize(user_bin_filenames.size());
+        std::fill(filename_position_to_ibf_bin.begin(), filename_position_to_ibf_bin.end(), std::make_tuple(0,0,0));
+        for (uint64_t idx=0; idx < user_bin_filenames.size(); idx++){ // warning: comparison of integer expressions of different signedness: solve this by declaring idx as size_t ipv int ?  â€˜intâ€™ and â€˜std::vector<std::__cxx11::basic_string<char> >::size_typeâ€™ {aka â€˜long unsigned intâ€™} [-Wsign-compare]
+            std::string filename = user_bin_filenames[idx];             // Question: create string view from filename?
+            filename_to_idx.emplace(filename, idx);
+        } // or something similar to parse_user_bin_ids
+
+        for (uint64_t ibf_idx=0; ibf_idx < ibf_bin_to_filename_position.size(); ibf_idx++){ // or should this be uint64_t instead of size_t, here and in the following.
+            for (uint64_t bin_idx=0; bin_idx < ibf_bin_to_filename_position[ibf_idx].size(); bin_idx++){
+                int64_t filename_position = ibf_bin_to_filename_position[ibf_idx][bin_idx]; // Question: should I use references here?
+                if (std::get<2>(filename_position_to_ibf_bin[filename_position])){ //for split bins.
+                    ++std::get<2>(filename_position_to_ibf_bin[filename_position]);
+                }else{
+                    filename_position_to_ibf_bin[filename_position] = std::make_tuple(ibf_idx, bin_idx, 1); // as a user bin can take up multiple bins, this should consist of multiple bin_idx or multiple tuples.
+                }
+            }
+        }
+
+//        // todo check if succesful filename_to_idx
+//        std::cout << "check if succesful filename_to_idx \n";
+//        for (int idx=0; idx < user_bin_filenames.size(); idx++){ // warning: comparison of integer expressions of different signedness: â€˜intâ€™ and â€˜std::vector<std::__cxx11::basic_string<char> >::size_typeâ€™ {aka â€˜long unsigned intâ€™} [-Wsign-compare]
+//            std::string filename = user_bin_filenames[idx];             // Question: create string view from filename?
+//            std::cout << filename_to_idx[filename];
+//        }
+    }
+
+    /*!\brief Returns the bin and IBF indices within the HIBF of a given user bin, specified by filename.
+     * \details
+     * Should only be used when filename_position_to_ibf_bin has been created, and after checking the filename is present in the filename_to_idx map
+     */
+    std::tuple <uint64_t, uint64_t, uint16_t> find_filename(std::string filename)
+    {
+        return filename_position_to_ibf_bin[filename_to_idx[filename]];
+    }// todo Signal: SIGSEGV (Segmentation fault). After the first time of indexing the user_bin_filenames, ibf_to .. and file_name_position_to_ibf_bin are empty. and so is the ibf_vector.
+    // all these structures were still present when querying the first bin bin_00. This was found correctly (0,57,3). But after calling the function get_location all is gone.
+    // Only the first bin bin_01 is present in filename_to_idx at this point. Probably it has been placed there when querying filename_to_idx[..]. (?)
+    // Maybe first try without placing anything in the IBF.
+    //
+
+    //!\brief Checks if the filename is already present in the HIBF.
+    bool exists_filename(const std::string & filename)
+    {
+    if (filename_to_idx.find(filename) == filename_to_idx.end())
+        return false; // filename/user bin is not yet present in HIBF
+    else
+        return true; // filename/user bin does already exist in HIBF
+    }
+
+    void update_filename_indices(std::string filename, size_t const ibf_idx, size_t const bin_idx, size_t const number_of_bins){
+        user_bin_filenames.push_back(filename); // or resize it first to add filename to the end of "filenames"
+        filename_to_idx[filename] = user_bin_filenames.size();
+        // for index_pair in index_pairs:
+        filename_position_to_ibf_bin[user_bin_filenames.size()] = std::make_tuple(ibf_idx, bin_idx, number_of_bins); // or resize it first?
+        ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ; // possibly resize to update ibf_bin_to_filename_position and filenames
+    }
+
     //!\brief Returns the number of managed user bins.
     size_t num_user_bins() const noexcept
     {
@@ -242,8 +329,7 @@ public:
      */
     template <typename stream_t>
     void write_filenames(stream_t & out_stream) const
-    {
-        size_t position{};
+    {   size_t position{};
         std::string line{};
         for (auto const & filename : user_bin_filenames)
         {
@@ -263,8 +349,7 @@ public:
      * \tparam archive_t Type of `archive`; must satisfy seqan3::cereal_archive.
      * \param[in] archive The archive being serialised from/to.
      *
-     * \attention These functions are never called directly.
-     * \sa https://docs.seqan.de/seqan/3.2.0/group__io.html#serialisation
+     * \attention These functions are never called directly, see \ref serialisation for more details.
      */
     template <typename archive_t>
     void serialize(archive_t & archive)
@@ -307,8 +392,8 @@ private:
 
             if (current_filename_index < 0) // merged bin
             {
-                if (sum >= threshold)
-                    bulk_contains_impl(values, hibf_ptr->next_ibf_id[ibf_idx][bin], threshold);
+                if (sum >= threshold) // if ibf contains the query.
+                    bulk_contains_impl(values, hibf_ptr->next_ibf_id[ibf_idx][bin], threshold); //recursive
                 sum = 0u;
             }
             else if (bin + 1u == result.size() ||                                                    // last bin
@@ -385,6 +470,7 @@ public:
                                                              size_t const threshold) && noexcept = delete;
     //!\}
 };
+
 
 #if RAPTOR_HIBF_HAS_COUNT
 /*!\brief Manages counting ranges of values for the hibf::hierarchical_interleaved_bloom_filter.

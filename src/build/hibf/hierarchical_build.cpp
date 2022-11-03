@@ -47,19 +47,20 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     for (size_t i = start; i < current_node_data.remaining_records.size(); ++i)
     {
         auto const & record = current_node_data.remaining_records[i];
+        if (record.filenames[0] != "empty_bin"){
+            if (is_root && record.number_of_bins.back() == 1) // no splitting needed
+            {
+                insert_into_ibf(arguments, record, ibf);
+            }
+            else
+            {
+                compute_kmers(kmers, arguments, record);
+                insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
+            }
 
-        if (is_root && record.number_of_bins.back() == 1) // no splitting needed
-        {
-            insert_into_ibf(arguments, record, ibf);
+            update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
+            kmers.clear();
         }
-        else
-        {
-            compute_kmers(kmers, arguments, record);
-            insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
-        }
-
-        update_user_bins(data, filename_indices, record);
-        kmers.clear();
     }
 
     data.hibf.ibf_vector[ibf_pos] = std::move(ibf);
