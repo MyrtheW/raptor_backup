@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.18)
 
+
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -12,6 +13,7 @@ raptor_require_ccache ()
 
 # Dependency: Chopper
 include (FetchContent)
+
 
 FetchContent_Declare (raptor_chopper_project URL "${RAPTOR_SUBMODULES_DIR}/chopper")
 
@@ -46,13 +48,11 @@ set (BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable (raptor_xxhash_project)
 
 # Shared interface
-add_library ("raptor_interface" INTERFACE)
-target_link_libraries ("raptor_interface" INTERFACE seqan3::seqan3 chopper_lib)
-target_include_directories ("raptor_interface" INTERFACE ../include)
-target_include_directories ("raptor_interface" SYSTEM INTERFACE ${RAPTOR_SUBMODULES_DIR}/chopper/include)
-target_include_directories ("raptor_interface" SYSTEM INTERFACE ${RAPTOR_SUBMODULES_DIR}/robin-hood-hashing/src/include)
-target_compile_options ("raptor_interface" INTERFACE "-pedantic" "-Wall" "-Wextra")
-add_dependencies (raptor_interface chopper_lib)
+if (NOT TARGET raptor_interface)
+    add_library ("raptor_interface" INTERFACE)
+    target_link_libraries ("raptor_interface" INTERFACE raptor::raptor)
+    target_compile_options ("raptor_interface" INTERFACE "-pedantic" "-Wall" "-Wextra")
+endif ()
 
 # Raptor library
 if (NOT TARGET raptor_lib)
@@ -60,17 +60,13 @@ if (NOT TARGET raptor_lib)
     target_link_libraries ("raptor_lib" INTERFACE "raptor_argument_parsing" "raptor_build" "raptor_build_hibf"
                                                   "raptor_search" "raptor_threshold" "raptor_upgrade" "raptor_layout"
     )
+
 endif ()
 
 # Raptor executable
-add_executable ("raptor" raptor.cpp)
-target_link_libraries ("raptor" PUBLIC "raptor_lib")
-
-install (TARGETS raptor DESTINATION bin)
-if (NOT CMAKE_VERSION VERSION_LESS 3.21) # cmake >= 3.21
-    install (IMPORTED_RUNTIME_ARTIFACTS chopper DESTINATION bin)
-else ()
-    install (PROGRAMS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/chopper" DESTINATION bin)
+if (NOT TARGET raptor)
+    add_executable ("raptor" raptor.cpp)
+    target_link_libraries ("raptor" PUBLIC "raptor_lib")
 endif ()
 
 
