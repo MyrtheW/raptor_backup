@@ -96,7 +96,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
     size_t const ibf_idx = std::get<0>(index_triple);
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);
-    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] todo: select by reference
+    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[]
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 

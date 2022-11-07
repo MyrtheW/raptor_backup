@@ -168,18 +168,19 @@ public:
         for (std::vector<std::string> const & vector_of_paths : values)
         {
             for (std::string const & value : vector_of_paths)
-            {
-                std::filesystem::path const file_path{value};
+            {   if (value != "empty_bin"){ //myrthe
+                    std::filesystem::path const file_path{value};
 
-                if (is_minimiser_input && (file_path.extension() != ".minimiser"))
-                    throw sharg::validation_error{"You cannot mix sequence and minimiser files as input."};
-                if (std::filesystem::file_size(file_path) == 0u)
-                    throw sharg::validation_error{"The file " + value + " is empty."};
+                    if (is_minimiser_input && (file_path.extension() != ".minimiser"))
+                        throw sharg::validation_error{"You cannot mix sequence and minimiser files as input."};
+                    if (std::filesystem::file_size(file_path) == 0u)
+                        throw sharg::validation_error{"The file " + value + " is empty."};
 
-                if (is_minimiser_input)
-                    minimiser_file_validator(file_path);
-                else
-                    sequence_file_validator(file_path);
+                    if (is_minimiser_input)
+                        minimiser_file_validator(file_path);
+                    else
+                        sequence_file_validator(file_path);
+                }
             }
         }
     }

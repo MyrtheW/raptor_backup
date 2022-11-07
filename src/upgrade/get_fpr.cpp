@@ -66,7 +66,35 @@ if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of exi
 
 
 //DELETE UB
+void delete_ub(std::vector<std::string> const & filename,
+                    raptor_index<index_structure::hibf> & index){
 
+    if (not index.ibf().user_bins.exists_filename(filename[0])) // first find index
+    {
+        std::cout << "Warning: the user bin you want to delete is not present in the HIBF: "; // + filename; //--> if not: return error , make sure by doing this, we dont accidently add the filename..
+    }else{
+        std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
+
+        // empty UB
+        size_t const ibf_idx = std::get<0>(index_triple);
+        size_t const start_bin_idx = std::get<1>(index_triple);
+        size_t const number_of_bins = std::get<2>(index_triple);
+        auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
+
+        for (size_t chunk_number=0; chunk_number<number_of_bins; ++chunk_number)
+        {
+            seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};
+            auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
+            ibf.clear(bin_index);
+        }
+    }
+
+    index.ibf().user_bins.delete_filename(filename[0]);  // update filename tables. even if the UB did not exist, it might have been added through the STL .find() function.
+
+     // update FPR table and #kmer table.
+    //...
+
+}
 
 } // end namespace
 

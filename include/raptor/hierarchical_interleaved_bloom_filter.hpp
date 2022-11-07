@@ -226,26 +226,17 @@ public:
             }
         }
 
-//        // todo check if succesful filename_to_idx
-//        std::cout << "check if succesful filename_to_idx \n";
-//        for (int idx=0; idx < user_bin_filenames.size(); idx++){ // warning: comparison of integer expressions of different signedness: â€˜intâ€™ and â€˜std::vector<std::__cxx11::basic_string<char> >::size_typeâ€™ {aka â€˜long unsigned intâ€™} [-Wsign-compare]
-//            std::string filename = user_bin_filenames[idx];             // Question: create string view from filename?
-//            std::cout << filename_to_idx[filename];
-//        }
     }
 
     /*!\brief Returns the bin and IBF indices within the HIBF of a given user bin, specified by filename.
      * \details
      * Should only be used when filename_position_to_ibf_bin has been created, and after checking the filename is present in the filename_to_idx map
+     * \author Myrthe
      */
     std::tuple <uint64_t, uint64_t, uint16_t> find_filename(std::string filename)
     {
         return filename_position_to_ibf_bin[filename_to_idx[filename]];
-    }// todo Signal: SIGSEGV (Segmentation fault). After the first time of indexing the user_bin_filenames, ibf_to .. and file_name_position_to_ibf_bin are empty. and so is the ibf_vector.
-    // all these structures were still present when querying the first bin bin_00. This was found correctly (0,57,3). But after calling the function get_location all is gone.
-    // Only the first bin bin_01 is present in filename_to_idx at this point. Probably it has been placed there when querying filename_to_idx[..]. (?)
-    // Maybe first try without placing anything in the IBF.
-    //
+    }
 
     //!\brief Checks if the filename is already present in the HIBF.
     bool exists_filename(const std::string & filename)
@@ -258,10 +249,19 @@ public:
 
     void update_filename_indices(std::string filename, size_t const ibf_idx, size_t const bin_idx, size_t const number_of_bins){
         user_bin_filenames.push_back(filename); // or resize it first to add filename to the end of "filenames"
-        filename_to_idx[filename] = user_bin_filenames.size();
+        filename_to_idx[filename] = user_bin_filenames.size(); // We should not assume filename_to_idx has the same size as user_bin_filenames, but as we do not remove deleted bins from 'user_bin_filenames' nor from 'filename_position_to_ibf_bin', we should use user_bin_filenames.size()
         // for index_pair in index_pairs:
         filename_position_to_ibf_bin[user_bin_filenames.size()] = std::make_tuple(ibf_idx, bin_idx, number_of_bins); // or resize it first?
         ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ; // possibly resize to update ibf_bin_to_filename_position and filenames
+    }
+
+    void delete_filename(const std::string & filename){
+        // --> from user_bin_filenames
+    // --> from filename_to_idx
+    // set to 'empty_bin', is probably cheaper than removing the value? perhaps related to a number?
+    // The other 2 ( ) do not have to be changed per se, but make sure that when inserting a new bin, the 'number of bins' is updated.
+        user_bin_filenames[filename_to_idx[filename]] ="empty_bin"; //if you delete the item, and decrease the list size, you would have to remake ibf_bin_to_filename_position. Empty bins should also be initiliaze as empty_bin in this list (if building is correct/as should). Check this.
+        filename_to_idx.erase(filename);
     }
 
     //!\brief Returns the number of managed user bins.
