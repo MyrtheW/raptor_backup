@@ -28,6 +28,7 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
     size_t const kmers_per_bin{};
     if (record.filenames[0] != "empty_bin"){ //kmers.size() == 0){ myrthe,
         size_t const kmers_per_bin{record.estimated_sizes[0]};//myrthe varify with Svenja that this is correct //size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(record.estimated_sizes[0]) / number_of_bins))}; //assuming estimated_sizes[0] belongs to the first bin?
+        // todo debug: estimated sizes is empty.
     }else{
         size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(kmers.size()) / number_of_bins))};
     }
