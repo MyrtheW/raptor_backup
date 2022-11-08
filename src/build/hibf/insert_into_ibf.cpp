@@ -18,7 +18,7 @@ namespace raptor::hibf
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      robin_hood::unordered_flat_set<size_t> const & kmers,
                      size_t const number_of_bins,
-                     size_t const bin_index,
+                     size_t const bin_index, // Bin_index: xth bin in an IBF
                      seqan3::interleaved_bloom_filter<> & ibf,
                      bool is_root)
 {
@@ -90,7 +90,7 @@ namespace raptor{
 
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
-                    raptor_index<index_structure::hibf> & index) //Question: How to parse the index or HIBF as an argument?
+                    raptor_index<index_structure::hibf> & index)
 { // change this, so that if you have multiple technical bins of different sizes, you can create the chunks in accordance to these sizes.
 
     size_t const ibf_idx = std::get<0>(index_triple);

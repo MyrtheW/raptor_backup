@@ -25,13 +25,12 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
 {
     auto & node_data = data.node_map[node];
     auto const & record = node_data.remaining_records[0]; //myrthe, check if it is always the case that initialized max bin kmers is called before.
-    size_t const kmers_per_bin{};
-    if (record.filenames[0] != "empty_bin"){ //kmers.size() == 0){ myrthe,
-        size_t const kmers_per_bin{record.estimated_sizes[0]};//myrthe varify with Svenja that this is correct //size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(record.estimated_sizes[0]) / number_of_bins))}; //assuming estimated_sizes[0] belongs to the first bin?
-        // todo debug: estimated sizes is empty.
-    }else{
-        size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(kmers.size()) / number_of_bins))};
-    }
+    //size_t const kmers_per_bin{};
+
+//    assert (record.filenames[idx] != "empty_bin"){ // or kmers.size() == 0. myrthe
+//       //myrthe varify with Svenja that this is correct //size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(record.estimated_sizes[0]) / number_of_bins))}; //assuming estimated_sizes[0] belongs to the first bin?
+
+    size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(kmers.size()) / number_of_bins))};
     double const bin_bits{static_cast<double>(bin_size_in_bits(arguments, kmers_per_bin))};
     seqan3::bin_size const bin_size{static_cast<size_t>(std::ceil(bin_bits * data.fp_correction[number_of_bins]))};
     seqan3::bin_count const bin_count{node_data.number_of_technical_bins};

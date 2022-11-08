@@ -84,8 +84,8 @@ void delete_ub(std::vector<std::string> const & filename,
         for (size_t chunk_number=0; chunk_number<number_of_bins; ++chunk_number)
         {
             seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};
-            auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
-            ibf.clear(bin_index);
+            //auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
+            ibf.clear(bin_idx);
         }
     }
 
