@@ -23,7 +23,7 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                           lemon::ListDigraph::Node const & current_node,
                           build_data<data_layout_mode> & data,
                           build_arguments const & arguments,
-                          bool is_root)
+                          bool is_root) // add argument; (parent_)n_empty_bins input
 {
     auto & current_node_data = data.node_map[current_node];
 
@@ -38,17 +38,18 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
             // Instead I could use the estimated file sizes, i.e.:  size_t const kmers_per_bin{record.estimated_sizes[0]};
         // this would be an option, but then I would need  to adapt parse_chopper_pack_line and saving the layout, because this information is currently not stored. Perhaps I could also store it in the filename.
         // now there could exist a case where all BFs in the IBF are empty.
-    for (; current_node_data.max_bin_index < ibf_positions.size(); current_node_data.max_bin_index++){
+    //for (; current_node_data.max_bin_index < ibf_positions.size(); current_node_data.max_bin_index++){
         // or perhaps set node.max_bin_index +=1, but I might be mininterpreting it: is max_bin_index the index of the maximum sized bin in the IBF, or is it the index of the IBF in the HIBF, which seems from "ibf_positions[node_data.max_bin_index]", but std::vector<int64_t> ibf_positions(current_node_data.number_of_technical_bins, ibf_pos);
         // todo: ask Svenja: what is ibf_positions?
         // it could be that remaining records and bin_indices are not synchonized.
-        if ( current_node_data.remaining_records[current_node_data.max_bin_index].filenames[0] != "empty_bin" //current_node.record.filenames[current_node_data.max_bin_index] != "empty_bin"
-        ){ // also add a case for if all BFs are empty bins?
+//        if ( //current_node_data.remaining_records[current_node_data.max_bin_index].filenames[0] != "empty_bin" //current_node.record.filenames[current_node_data.max_bin_index] != "empty_bin"
+//        (std::filesystem::path(current_node_data.remaining_records[current_node_data.max_bin_index].filenames[0]).extension() !=".empty_bin")
+//                ){ // also add a case for if all BFs are empty bins?
 
             // initialize lower level IBF
             size_t const max_bin_tbs =
             initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments); // or add max_bin_index
-            auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root);
+            auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root); // add is_leaf parameter to define if it
             kmers.clear(); // reduce memory peak
 
             // We assume that max_bin_index corresponds to the first entry in remaining records. Can we also assume that the remaining records are further sorted on size, and based on in what ibf they should go?
@@ -73,7 +74,7 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     for (size_t i = start; i < current_node_data.remaining_records.size(); ++i)
     {
         auto const & record = current_node_data.remaining_records[i];
-        if (record.filenames[0] != "empty_bin"){ // only the first entry of filenames stores something, hence the [0]
+        if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // only the first entry of filenames stores something, hence the [0]
             if (is_root && record.number_of_bins.back() == 1) // no splitting needed
             {
                 insert_into_ibf(arguments, record, ibf);
@@ -83,19 +84,18 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 compute_kmers(kmers, arguments, record);
                 insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
             }
-
-            update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
             kmers.clear();
         }
+        update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
     }
 
     data.hibf.ibf_vector[ibf_pos] = std::move(ibf);
     data.hibf.next_ibf_id[ibf_pos] = std::move(ibf_positions);
     data.hibf.user_bins.bin_indices_of_ibf(ibf_pos) = std::move(filename_indices);
 
-    break;
-        }
-    }
+//    break;
+//        }
+//    }
     return ibf_pos;
 }
 
@@ -112,3 +112,8 @@ template size_t hierarchical_build<seqan3::data_layout::compressed>(robin_hood::
                                                                     bool);
 
 } // namespace raptor::hibf
+
+
+// ah ok in raptor. to 1)
+//Yes you can assume that after rearrangement (based on size and maybe also similarity), the layouting does not alter the order of user bins. It just merges bins, usually at the right end side of the range of UBs because there are the small ones. So we can assume that the large bins are at the beginning. Either THE most largest bin is at the beginning, or there is a range of euqally large bins that have bin rearranged for similarity but since they are similarily lagre, I can still just take the first one.
+//At least I assume that's what we meant. There is a slight possibility that we somewhere make sure that the bax bin out first. You could search some more in the code. If you think there is, I can also take a look again

@@ -37,6 +37,12 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 parent_kmers.insert(value);
         }
     }
+        // todo fill/update occupancy_table
+    auto occupancy_per_bin = kmers.size()/number_of_bins;
+    for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
+        index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] += occupancy_per_bin;
+        index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = index.tb_fpr(ibf_idx, start_bin_idx); // precalculate this one, so you don't have to repeat
+    }
 }
 
 template <typename arguments_t> //Myrthe 14.10
@@ -84,13 +90,12 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 } // namespace raptor::hibf
 
 namespace raptor{
-    // only if IBF is uncompressed.
+
      //Myrthe
-//     using index_structure_t = std::conditional_t<seqan3::uncompressed, index_structure::hibf_compressed, index_structure::hibf>;
 
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
-                    raptor_index<index_structure::hibf> & index)
+                    raptor_index<index_structure::hibf> & index) // only if IBF is uncompressed.
 { // change this, so that if you have multiple technical bins of different sizes, you can create the chunks in accordance to these sizes.
 
     size_t const ibf_idx = std::get<0>(index_triple);
@@ -110,6 +115,12 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
             auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
             ibf.emplace(value, bin_index);
         }
+    }
+
+    auto occupancy_per_bin = kmers.size()/number_of_bins;
+    for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
+        index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] += occupancy_per_bin;
+        index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = index.tb_fpr(ibf_idx, start_bin_idx); // precalculate this one, so you don't have to repeat
     }
 }
 
