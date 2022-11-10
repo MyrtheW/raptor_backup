@@ -12,6 +12,7 @@
 #include <seqan3/io/sequence_file/input.hpp>
 
 #include <raptor/strong_types.hpp>
+#include <string.h>
 
 namespace raptor::detail
 {
@@ -168,7 +169,7 @@ public:
         for (std::vector<std::string> const & vector_of_paths : values)
         {
             for (std::string const & value : vector_of_paths)
-            {   if (value != "empty_bin"){ //myrthe
+            {   if (std::filesystem::path(value).extension() !=".empty_bin"){ //myrthe (value.substr(std::max(0,int(value.size()-10)), value.size()) != ".empty_bin")
                     std::filesystem::path const file_path{value};
 
                     if (is_minimiser_input && (file_path.extension() != ".minimiser"))

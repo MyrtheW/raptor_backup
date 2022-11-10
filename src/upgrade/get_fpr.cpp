@@ -83,17 +83,17 @@ void delete_ub(std::vector<std::string> const & filename,
 
         for (size_t chunk_number=0; chunk_number<number_of_bins; ++chunk_number)
         {
-            seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};
-            //auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
+            seqan3::bin_index const bin_idx{start_bin_idx + chunk_number}; //auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
             ibf.clear(bin_idx);
         }
+
+         for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
+            index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = 0;
+            index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] = 0;
+         }
     }
 
     index.ibf().user_bins.delete_filename(filename[0]);  // update filename tables. even if the UB did not exist, it might have been added through the STL .find() function.
-
-     // update FPR table and #kmer table.
-    //...
-
 }
 
 } // end namespace

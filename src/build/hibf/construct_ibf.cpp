@@ -25,12 +25,19 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
 {
     auto & node_data = data.node_map[node];
     auto const & record = node_data.remaining_records[0]; //myrthe, check if it is always the case that initialized max bin kmers is called before.
-    //size_t const kmers_per_bin{};
+    unsigned long kmers_per_bin{};
 
 //    assert (record.filenames[idx] != "empty_bin"){ // or kmers.size() == 0. myrthe
 //       //myrthe varify with Svenja that this is correct //size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(record.estimated_sizes[0]) / number_of_bins))}; //assuming estimated_sizes[0] belongs to the first bin?
+    if (node_data.favourite_child == lemon::INVALID //not a merged bin
+    and std::filesystem::path(record.filenames[0]).extension() ==".empty_bin"){ // empty bin
+        std::string kmer_count = (std::string) std::filesystem::path(record.filenames[0]).stem();
+        double kmer_count_double = ::atof(kmer_count.c_str());
+        kmers_per_bin = static_cast<size_t>(std::ceil(static_cast<double>(kmer_count_double/ number_of_bins)));
+    }else{
+        kmers_per_bin=static_cast<size_t>(std::ceil(static_cast<double>(kmers.size()) / number_of_bins)); // todo if it is a merged bin, check if it has empty bin childeren. if so, increase kmers_per_bins appropiately.
+    }
 
-    size_t const kmers_per_bin{static_cast<size_t>(std::ceil(static_cast<double>(kmers.size()) / number_of_bins))};
     double const bin_bits{static_cast<double>(bin_size_in_bits(arguments, kmers_per_bin))};
     seqan3::bin_size const bin_size{static_cast<size_t>(std::ceil(bin_bits * data.fp_correction[number_of_bins]))};
     seqan3::bin_count const bin_count{node_data.number_of_technical_bins};
