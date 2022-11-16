@@ -37,8 +37,39 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 parent_kmers.insert(value);
         }
     }
-    // fill/update occupancy_table //todo add index as a function argument.
-    index.ibf().update_occupancy_table(kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
+
+}
+
+// alternative function that uses index as input,
+
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
+                     robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
+                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                     raptor_index<index_structure::hibf> & index,
+                     bool is_root)
+{
+    size_t const ibf_idx = std::get<0>(index_triple);
+    size_t const start_bin_idx = std::get<1>(index_triple);
+    size_t const number_of_bins = std::get<2>(index_triple);
+    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[]
+    size_t const chunk_size = kmers.size() / number_of_bins + 1;
+    size_t chunk_number{};
+
+
+    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
+    {
+        assert(chunk_number < number_of_bins);
+        seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};
+        ++chunk_number;
+        for (size_t const value : chunk)
+        {
+            ibf.emplace(value, bin_idx);
+            if (!is_root)
+                parent_kmers.insert(value);
+        }
+    }
+    //size_t kmer_count = kmers.size();
+    index.ibf().update_occupancy_table((size_t) kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
     auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
 
 }
@@ -90,7 +121,7 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 namespace raptor{
 
      //Myrthe
-
+// write comments
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                     raptor_index<index_structure::hibf> & index) // only if IBF is uncompressed.
@@ -121,10 +152,10 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
 
 
 
-// todo:
-//        if (fpr  > threshold){
-//        Rebuild!
-//        }
+    // todo:
+    //        if (fpr  > threshold){
+    //        Rebuild!
+    //        }
 
 }
 

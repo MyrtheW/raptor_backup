@@ -162,12 +162,12 @@ public:
                 // dit moet ook geinitializeerd worden, bij traversing IBF, en dan naar lagere te gaan.
         // loop over next_ibf_id --> werkt niet, want dan weet je niet waar de laagste vandaan komen. Of kan het wel ? next_ibf_id[ibf_id_high][bin_id_high]=[ibf_id_low]
         // traverse HIBF. [ibf_id
-        auto number_ibfs = ibf_vector.size();
+        //auto number_ibfs = ibf_vector.size();
         previous_ibf_id.resize(ibf_vector.size());
         std::fill(previous_ibf_id.begin(), previous_ibf_id.end(), std::make_tuple(0,0)); // instead of number_ibfs, initialize with root_idx (=0). Then if previous_ibf_id[ibf_idx]=ibf_idx, then ibf_idx=root_idx. Previously std::make_tuple(number_of_ibs, 0)
         for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ibf_id_high++){
             for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); bin_idx++){
-                auto ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
+                uint64_t ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
                 if (ibf_id_low != ibf_id_high){ // it might happen that ibf_id_low == ibf_id_high for LBs, and we should not overwrite the entry.
                      previous_ibf_id[ibf_id_low] = std::make_tuple(ibf_id_high, bin_idx);
                 }
@@ -206,14 +206,14 @@ public:
      * \param[in] number_of_bins index of TB in IBF.
      * \author Myrthe
      */
-    double update_fpr(size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1)
+    double update_fpr(size_t ibf_idx, size_t bin_idx, size_t number_of_bins = 1)
     {
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
         auto kmer_count = occupancy_table[ibf_idx][bin_idx];
-        auto bin_size = ibf_vector[ibf_idx].bin_size();
-        auto hash_funs = ibf_vector[ibf_idx].hash_function_count();
+        auto bin_size = ibf.bin_size();
+        auto hash_funs = ibf.hash_function_count();
         auto fpr = approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
-        for (int offset=0; offset < number_of_bins; offset++){  //loop over split bins and add multiple testing correction
+        for (size_t offset=0; offset < number_of_bins; offset++){  //loop over split bins and add multiple testing correction
             fpr_table[ibf_idx][bin_idx+offset] = fpr;
         }
         return fpr;
@@ -223,18 +223,25 @@ public:
         return(fpr_table[ibf_idx][bin_idx]);
     }
 
-    void update_occupancy_table(size_t & kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
+    void update_occupancy_table(size_t kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
         auto occupancy_per_bin = std::round(kmer_count/number_of_bins);
-        for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
+        for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
             occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
         }
     }
 
-    double ibf_max_kmers(size_t ibf_idx, double const fpr=0.05){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
+    void resize_occupancy_table(size_t kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
+        auto occupancy_per_bin = std::round(kmer_count/number_of_bins);
+        for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
+            occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
+        }
+    }
+
+    double ibf_max_kmers(size_t ibf_idx, double fpr=0.05){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
-        size_t bin_size = ibf_vector[ibf_idx].bin_size();
-        size_t hash_funs = ibf_vector[ibf_idx].hash_function_count();//arguments.hash
-        return approximate_kmer_capacity(bin_size, fpr , hash_funs);
+        size_t bin_size = ibf.bin_size();
+        size_t hash_funs = ibf.hash_function_count();//arguments.hash
+        return approximate_kmer_capacity(bin_size, fpr, hash_funs);
     }
 
     size_t approximate_kmer_capacity(size_t & m, double & fpr, size_t & h) //max number of kmers that fits in a TB, a value specific to an IBF
@@ -245,13 +252,12 @@ public:
     } // can be a property stored per ibf, so it does not need to be recalculated. (Can be 0 for empty IBFs)
         // bin_size_in_bits https://github.com/seqan/raptor/blob/7fe02401bb4f191e2ef4e1454ea9a1c7756816ca/src/build/hibf/bin_size_in_bits.cpp can be used to calculate m from fpr, n and h
 
-    size_t number_of_bins(size_t ibf_idx, size_t kmer_count,  double const fpr=0.05){
+    size_t number_of_bins(size_t ibf_idx, size_t kmer_count,  double fpr=0.05){
         // given an ibf, with a certain bin size, how many technical bins are needed to store a certain number of kmers, considering the multiple testing problem?
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
-        size_t bin_size = ibf_vector[ibf_idx].bin_size();
-        size_t hash_funs = ibf_vector[ibf_idx].hash_function_count();
-        // first guess
-        size_t number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx));
+        size_t bin_size = ibf.bin_size();
+        size_t hash_funs = ibf.hash_function_count();
+        size_t number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx));         // first guess
         while (approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins) > fpr){
             number_of_bins++;
         }

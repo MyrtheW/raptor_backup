@@ -1,4 +1,4 @@
-#include <raptor/upgrade/get_fpr.hpp>
+#include <raptor/update/insertions.hpp>
 #include <raptor/build/hibf/compute_kmers.hpp>
 #include <raptor/build/hibf/insert_into_ibf.hpp>
 //#include <algorithm> // for std::max
@@ -30,7 +30,7 @@ if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of exi
     }
 }
 
-void upgrade_hibf(upgrade_arguments const & arguments,
+void update_hibf(upgrade_arguments const & arguments,
                   raptor_index<index_structure::hibf> & index)   //std::move is not correct to use here. https://stackoverflow.com/questions/3413470/what-is-stdmove-and-when-should-it-be-used
 {
     robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
@@ -126,8 +126,9 @@ std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(size_t & kmer_count, raptor_
     } // if the whole loop is run through, no appropiate empty bin is found and the bin idx will be the size of the IBF.
     if (bin_idx == ibf_bin_count){// then there is no empty bin. Resize IBF .  or ibf.bin_count()
         double EB_percentage = 0.1;
-        size_t new_ibf_bin_count = std::max((size_t) std::round(EB_percentage*ibf_bin_count), ibf_bin_count + number_of_bins);
+        size_t new_ibf_bin_count = std::max((size_t) std::round(EB_percentage*ibf_bin_count), ibf_bin_count + number_of_bins); // should best be a multiple of 64. Make sure that when calling void increase_bin_number_to(bin_count const new_bins_), it increases.
         index.ibf().ibf_vector[ibf_idx].increase_bin_number_to((seqan3::bin_count) new_ibf_bin_count);
+        // todo change datastructures, like previous ibf, next ibf, occupancy table, fpr table.
     }
     return std::make_tuple(bin_idx, number_of_bins); //index_tuple
 }
