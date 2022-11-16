@@ -230,12 +230,25 @@ public:
         }
     }
 
-    void resize_occupancy_table(size_t kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
-        auto occupancy_per_bin = std::round(kmer_count/number_of_bins);
-        for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
-            occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
-        }
-    }
+        /*!\brief Update false positive rate of a TB.
+     * \details Calculates the approximate false positive rate of a certain technical bin, given its indices in the HIBF, using the approximate_fpr function and updates .
+
+     * \author Myrthe
+     */
+//    void resize_ibf_occupancy_table(size_t ibf_idx, size_t new_bin_count){
+//        assert(new_bin_count >= occupancy_table[ibf_idx].size()); // check that new bin count is larger then the size.
+//        occupancy_table[ibf_idx].resize(new_bin_count);
+//    }
+//    void resize_ibf_fpr_table(size_t ibf_idx, size_t new_bin_count){
+//        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
+//        fpr_table[ibf_idx].resize(new_bin_count);
+//    }
+//    void resize_hibf_fpr_table(size_t ibf_idx, size_t new_ibf_size){ //add new IBF to last index, with a vector of the size of the new IBF.
+//        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
+//        fpr_table.resize(fpr_table.size()+1);
+//    }
+
+// function for adding new ibf to the above
 
     double ibf_max_kmers(size_t ibf_idx, double fpr=0.05){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]

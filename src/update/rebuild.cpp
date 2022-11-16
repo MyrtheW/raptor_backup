@@ -12,17 +12,11 @@ void split_IBF(upgrade_arguments const & arguments)
 // ibf_idx of merged bin
 //
 {
-
+    //resize_HIBF
+    //      next_ibf_id
+    //      previous_ibf_id
 }
 
 
-}
+} // namespace raptor
 
-
-// for each of the bins in bin_paths: (maybe sort? or do this smartly somehow?
-
-
-// request_ibf_idx
-// request_user_bin_idx
-
-// when using such an existing function, make sure the arguments have the right arguments type, by using a template (see store_index.hpp how to) , typename arguments_t

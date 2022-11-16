@@ -12,7 +12,7 @@
 namespace raptor
 {
 
-void raptor_upgrade(upgrade_arguments const & arguments)
+void raptor_update(upgrade_arguments const & arguments)
 {    if (arguments.is_hibf)
     { std::cout<<"test";
         if (arguments.compressed)

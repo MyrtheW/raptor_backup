@@ -1,13 +1,13 @@
 #include <raptor/search/search_single.hpp>
 #include <raptor/update/load_hibf.hpp>
 #include <raptor/update/insertions.hpp>
-#include "raptor/build/store_index.hpp"
+#include <raptor/build/store_index.hpp>
 
 
 namespace raptor
 {
 template <bool compressed>
-void load_hibf(upgrade_arguments const & arguments)
+void load_hibf(upgrade_arguments const & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
 {
     using index_structure_t = std::conditional_t<compressed, index_structure::hibf_compressed, index_structure::hibf>;
     auto index = raptor_index<index_structure_t>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
