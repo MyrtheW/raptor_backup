@@ -126,9 +126,18 @@ std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(size_t & kmer_count, raptor_
     } // if the whole loop is run through, no appropiate empty bin is found and the bin idx will be the size of the IBF.
     if (bin_idx == ibf_bin_count){// then there is no empty bin. Resize IBF .  or ibf.bin_count()
         double EB_percentage = 0.1;
-        size_t new_ibf_bin_count = std::max((size_t) std::round(EB_percentage*ibf_bin_count), ibf_bin_count + number_of_bins); // should best be a multiple of 64. Make sure that when calling void increase_bin_number_to(bin_count const new_bins_), it increases.
+        size_t new_ibf_bin_count = std::max((size_t) std::round((1+EB_percentage)*ibf_bin_count), ibf_bin_count + number_of_bins);
+        // should best be a multiple of 64. Make sure that when calling void increase_bin_number_to(bin_count const new_bins_), it increases.
         index.ibf().ibf_vector[ibf_idx].increase_bin_number_to((seqan3::bin_count) new_ibf_bin_count);
-        // todo change datastructures, like previous ibf, next ibf, occupancy table, fpr table.
+        index.ibf().resize_ibf_occupancy_table(ibf_idx, new_ibf_bin_count);
+        index.ibf().resize_ibf_fpr_table(ibf_idx, new_ibf_bin_count);
+        index.ibf().resize_ibf_filename_positions(ibf_idx, new_ibf_bin_count);
+       // you don't have to update the next_ibf_id or previous_ibf_id . Check if a resize is needed for any of the other filename related datastructures.
+
+//            void resize_ibf_filename_positions(size_t ibf_idx, size_t new_bin_count){
+//        assert(new_bin_count >= occupancy_table[ibf_idx].size()); // check that new bin count is larger then the size. --> actually this is allowed to
+//        ibf_bin_to_filename_position[ibf_idx].resize(new_bin_count);
+
     }
     return std::make_tuple(bin_idx, number_of_bins); //index_tuple
 }

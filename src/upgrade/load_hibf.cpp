@@ -23,7 +23,7 @@ void load_hibf(upgrade_arguments const & arguments)
     // create datastructure for perfect ns.
 
     if constexpr (not compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
-        upgrade_hibf(arguments, std::move(index)); //
+        upgrade_hibf(arguments, index); //
     } // requires uncompressed type?  requires (compressed == false)
     else{ // todo try uncompressing a IBF
         auto some_compressed_ibf = index.ibf().ibf_vector[0];
