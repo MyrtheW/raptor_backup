@@ -37,12 +37,10 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 parent_kmers.insert(value);
         }
     }
-        // todo fill/update occupancy_table
-    auto occupancy_per_bin = kmers.size()/number_of_bins;
-    for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
-        index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] += occupancy_per_bin;
-        index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = index.tb_fpr(ibf_idx, start_bin_idx); // precalculate this one, so you don't have to repeat
-    }
+    // fill/update occupancy_table //todo add index as a function argument.
+    index.ibf().update_occupancy_table(kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
+    auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
+
 }
 
 template <typename arguments_t> //Myrthe 14.10
@@ -117,11 +115,17 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
         }
     }
 
-    auto occupancy_per_bin = kmers.size()/number_of_bins;
-    for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
-        index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] += occupancy_per_bin;
-        index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = index.tb_fpr(ibf_idx, start_bin_idx); // precalculate this one, so you don't have to repeat
-    }
+    // to improve the implementation, Perhaps do the FPR calculations for all bins to which kmers will be inserted before actually inserting.
+    index.ibf().update_occupancy_table(kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
+    auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
+
+
+
+// todo:
+//        if (fpr  > threshold){
+//        Rebuild!
+//        }
+
 }
 
 }

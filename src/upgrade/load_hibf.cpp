@@ -12,7 +12,6 @@ namespace raptor
 {
 template <bool compressed>
 void load_hibf(upgrade_arguments const & arguments)
-// requires uncompressed type?  requires (compressed == false)
 {
     using index_structure_t = std::conditional_t<compressed, index_structure::hibf_compressed, index_structure::hibf>;
     auto index = raptor_index<index_structure_t>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
@@ -25,14 +24,13 @@ void load_hibf(upgrade_arguments const & arguments)
 
     if constexpr (not compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
         upgrade_hibf(arguments, std::move(index)); //
-    }
-    else{ // try uncompressing a IBF
+    } // requires uncompressed type?  requires (compressed == false)
+    else{ // todo try uncompressing a IBF
         auto some_compressed_ibf = index.ibf().ibf_vector[0];
         seqan3::interleaved_bloom_filter<seqan3::data_layout::compressed> ibf_uncompressed{some_compressed_ibf};
-        auto index_copy = ibf_uncompressed; //delete this line
     }
-    // if arguments.compressed, it should be compressed again (?)
 
+    // if arguments.compressed, it should be compressed again (?)
     store_index(arguments.in_file, std::move(index), arguments); // store index
 }
 

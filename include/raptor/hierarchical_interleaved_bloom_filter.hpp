@@ -121,7 +121,15 @@ public:
      */
     std::vector<std::vector<int64_t>> next_ibf_id;
 
-    //!\brief Opposite of the above in a sense. // Myrthe.
+        /*!\brief Stores for each bin in each IBF of the HIBF the ID of the previous IBF.
+     * \details
+     * Assume we look up an IBF `i`, i.e. `previous_ibf_id[i]`.
+     * If `(j =number_ibfs, b =0)` is returned, there is no higher level IBF, and IBF 'i' is thus the root IBF.
+     * If `j != number_ibfs` is returned, there is a higher level IBF , with `j` is the ID of the higher
+     * level IBF in ibf_vector and bin `b` is the corresponding merged bin in this higher level IBF.
+          * \author Myrthe
+
+     */
     std::vector<std::tuple<int64_t, int64_t>> previous_ibf_id;
 
     //!\brief The table with FPR or occupancy values, [ibf_idx][bin_idx]
@@ -139,6 +147,14 @@ public:
         return typename hierarchical_interleaved_bloom_filter<data_layout_mode>::membership_agent{*this};
     }
 
+    bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
+        // Alternative to current implementation: use next_ibf_id.
+        // assume we look up a bin `b` in IBF `i`, i.e. `next_ibf_id[i][b]`. If `i` is returned, there is no lower level IBF, bin `b` is hence not a merged bin.
+        auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
+        if (current_filename_index < 0){
+            return true;
+        }else{ return false;} // merged bin
+    }
 
     void initialize_previous_ibf_id()
     {    //higher_ibf_id[ibf_idx] --> (higher_ibf_idx, bin_idx) . If higher_ibf_idx = std::vector<ibf_t>.size(), it does not exist .
@@ -148,51 +164,80 @@ public:
         // traverse HIBF. [ibf_id
         auto number_ibfs = ibf_vector.size();
         previous_ibf_id.resize(ibf_vector.size());
-        std::fill(previous_ibf_id.begin(), previous_ibf_id.end(), std::make_tuple(number_ibfs,0));
+        std::fill(previous_ibf_id.begin(), previous_ibf_id.end(), std::make_tuple(0,0)); // instead of number_ibfs, initialize with root_idx (=0). Then if previous_ibf_id[ibf_idx]=ibf_idx, then ibf_idx=root_idx. Previously std::make_tuple(number_of_ibs, 0)
         for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ibf_id_high++){
             for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); bin_idx++){
                 auto ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
-                previous_ibf_id[ibf_id_low] = std::make_tuple(ibf_id_high, bin_idx);
+                if (ibf_id_low != ibf_id_high){ // it might happen that ibf_id_low == ibf_id_high for LBs, and we should not overwrite the entry.
+                     previous_ibf_id[ibf_id_low] = std::make_tuple(ibf_id_high, bin_idx);
+                }
             }
         }
     }
 
     /*!\brief Approximates the false positive rate
      * \details Calculates the approximate probability of a false positive hit of a k-mer for a technical bin, based on the bin size, the number of kmers and the number of hash functions.
+     * The second function also uses the number of split bins, and returns the FPR for the user bin that was split among those bin. The probability to obtain a false positive answer for the user bin when querying those s techinical bins is 1 - (1 - fpr_tb)^s.
+     * The third function also accounts for the .  number_deleted_kmers/(alphabet_size**k) is the probabibility that a too be searched kmer is the same as a deleted kmer (that is still present in the bloom filter)
      * \ref
-     * Find the fomulas in the corresponding publication
+     * Find the formulas in the corresponding publication
      * \param[in] m size, in number of bits, of the bloom filter.
      * \param[in] n k-mer count, i.e. the number of kmers stored in the technical bin.
      * \param[in] h number of hash functions used.
+     * \param[in] s split bins: number of bins the among which the n k-mers are divided.
+     * \param[in] d deleted k-mers: number of k-mers that were virtually deleted from this bin.
      * \author Myrthe
+     * \comment It might be computationally faster to work with log2 fpr values, to prevent the power to the h
      */
-    double approximate_fpr(int & m, int & n, int & h){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
-        //Myrthe idea: it might be computationally faster to work with log2 fpr values, to prevent the power to the h
-        // when actually using deleted kmers, these need to be stored somewhere, and the value alphabet**k should be pre computed.
-        // number_deleted_kmers/(alphabet_size**k) is the probabibility that a too be searched kmer is the same as a deleted kmer (that is still present in the bloom filter)
+    double approximate_fpr(size_t & m, size_t & n, size_t & h){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
+       // when actually using deleted kmers, these need to be stored somewhere, and the value alphabet**k should be pre computed.
         return pow((1-exp(-h*n/m)), h); // - deleted_kmers/(alphabet**k)
     }
 
-    /*!\brief Calculates false positive rate of a TB.
-     * \details Calculates the approximate false positive rate of a certain technical bin, given its indices in the HIBF, using the approximate_fpr function.
+    double approximate_fpr(size_t & m, size_t & n, size_t & h, size_t & s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
+        return (1-pow(1 - approximate_fpr(m,n,h), s)); // - deleted_kmers/(alphabet**k)
+    }
+
+
+    /*!\brief Update false positive rate of a TB.
+     * \details Calculates the approximate false positive rate of a certain technical bin, given its indices in the HIBF, using the approximate_fpr function and updates .
      * \param[in] ibf_idx index of IBF in HIBF
-     * \param[in] bin_idx index of TB in IBF.
+     * \param[in] bin_idx index of TB in IBF
+     * \param[in] number_of_bins index of TB in IBF.
      * \author Myrthe
      */
-    double tb_fpr(size_t ibf_idx, size_t const bin_idx)
-    { // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
-        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
-        auto kmer_count = occupancy_table[ibf_idx][bin_idx]; //        occupied_bits = ; // again keep a table for this? // how to obtain the rank? or can I use an estimate based on the kmer_count?
-        auto bin_size = ibf_vector[ibf_idx].bin_size_;
-        auto hash_funs = ibf_vector[ibf_idx].hash_funs;//arguments.hash
-        return approximate_fpr(bin_size, kmer_count , hash_funs);
+    double update_fpr(size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1)
+    {
+        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
+        auto kmer_count = occupancy_table[ibf_idx][bin_idx];
+        auto bin_size = ibf_vector[ibf_idx].bin_size();
+        auto hash_funs = ibf_vector[ibf_idx].hash_function_count();
+        auto fpr = approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
+        for (int offset=0; offset < number_of_bins; offset++){  //loop over split bins and add multiple testing correction
+            fpr_table[ibf_idx][bin_idx+offset] = fpr;
+        }
+        return fpr;
     }
-    // fpr_table[ibf_idx][bin_idx] = get_fpr(ibf_idx, bin_idx)
 
-    // Max_n (fpr, length bf in ibf, update_seqs=false)  calculate maximum
-    // if not update_seqs, then it is simply dependend on the fpr_max and bin size.
+    double get_fpr(size_t ibf_idx, size_t const bin_idx){
+        return(fpr_table[ibf_idx][bin_idx]);
+    }
 
-    size_t max_kmers(int & m, double & fpr, int & h) //max number of kmers that fits in a TB, a value specific to an IBF
+    void update_occupancy_table(size_t & kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
+        auto occupancy_per_bin = std::round(kmer_count/number_of_bins);
+        for (int offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
+            occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
+        }
+    }
+
+    double ibf_max_kmers(size_t ibf_idx, double const fpr=0.05){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
+        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
+        size_t bin_size = ibf_vector[ibf_idx].bin_size();
+        size_t hash_funs = ibf_vector[ibf_idx].hash_function_count();//arguments.hash
+        return approximate_kmer_capacity(bin_size, fpr , hash_funs);
+    }
+
+    size_t approximate_kmer_capacity(size_t & m, double & fpr, size_t & h) //max number of kmers that fits in a TB, a value specific to an IBF
     // -> (although for split bins also possible, taking into account fpr correction)
     // -> should also possibly take into account fpr rate of merged bin above.
     {
@@ -200,12 +245,29 @@ public:
     } // can be a property stored per ibf, so it does not need to be recalculated. (Can be 0 for empty IBFs)
         // bin_size_in_bits https://github.com/seqan/raptor/blob/7fe02401bb4f191e2ef4e1454ea9a1c7756816ca/src/build/hibf/bin_size_in_bits.cpp can be used to calculate m from fpr, n and h
 
-    double average_fpr(ibf_idx){
-        // average over the fprs, skipping the empty bins
+    size_t number_of_bins(size_t ibf_idx, size_t kmer_count,  double const fpr=0.05){
+        // given an ibf, with a certain bin size, how many technical bins are needed to store a certain number of kmers, considering the multiple testing problem?
+        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
+        size_t bin_size = ibf_vector[ibf_idx].bin_size();
+        size_t hash_funs = ibf_vector[ibf_idx].hash_function_count();
+        // first guess
+        size_t number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx));
+        while (approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins) > fpr){
+            number_of_bins++;
+        }
+        return number_of_bins;
     }
-    double min_fpr(ibf_idx){
-        // average over the fprs, skipping the empty bins
-    }
+
+
+    // Max_n (fpr, length bf in ibf, update_seqs=false)  calculate maximum
+    // if not update_seqs, then it is simply dependend on the fpr_max and bin size.
+
+//    double average_fpr(ibf_idx){
+//        // average over the fprs, skipping the empty bins
+//    }
+//    double min_fpr(ibf_idx){
+//        // average over the fprs, skipping the empty bins
+//    }
 
 #if RAPTOR_HIBF_HAS_COUNT
     /*!\brief Returns a counting_agent_type to be used for counting.
