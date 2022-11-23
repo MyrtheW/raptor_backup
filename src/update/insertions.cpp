@@ -23,7 +23,11 @@ if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of exi
     //METHOD 1
     size_t root_idx = 0; // would assume so based on bulk_contains_impl
     size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx);
-    std::tuple <uint64_t, uint64_t> index_tuple = find_empty_bin_idx(kmer_count, index, ibf_idx);
+        size_t number_of_bins = 1; // calculate number of user bins needed.
+    if (ibf_idx==0 and index.ibf().ibf_max_kmers(ibf_idx) < kmer_count){ // if we are at the root we might have to split bins.
+              number_of_bins = index.ibf().number_of_bins(ibf_idx, kmer_count);     // calculate among how many bins we should split
+    }
+    std::tuple <uint64_t, uint64_t> index_tuple = find_empty_bin_idx(index, ibf_idx, number_of_bins);
     std::tuple <uint64_t, uint64_t, uint16_t> index_triple = {ibf_idx, std::get<0>(index_tuple), std::get<1>(index_tuple)};             // dummy: std::tuple <uint64_t, uint64_t, uint16_t> index_triple = {0,0,0} ; //or index_pair_list
 
     return index_triple;
@@ -63,22 +67,13 @@ void delete_ub(std::vector<std::string> const & filename,
         size_t const ibf_idx = std::get<0>(index_triple);
         size_t const start_bin_idx = std::get<1>(index_triple);
         size_t const number_of_bins = std::get<2>(index_triple);
-        auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
-
-        for (size_t chunk_number=0; chunk_number<number_of_bins; ++chunk_number)
-        {
-            seqan3::bin_index const bin_idx{start_bin_idx + chunk_number}; //auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
-            ibf.clear(bin_idx);
+        index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins)
         }
-
-         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
-            index.ibf().fpr_table[ibf_idx][start_bin_idx+offset] = 0;
-            index.ibf().occupancy_table[ibf_idx][start_bin_idx+offset] = 0;
-         }
-    }
-
     index.ibf().user_bins.delete_filename(filename[0]);  // update filename tables. even if the UB did not exist, it might have been added through the STL .find() function.
 }
+
+
+
 
 
 //TRAVERSE HIBF
@@ -106,13 +101,10 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
     }
     }
 
-std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(size_t & kmer_count, raptor_index<index_structure::hibf> & index, size_t ibf_idx){
+std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t ibf_idx, size_t number_of_bins=1){
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
 
-    size_t number_of_bins = 1; // calculate number of user bins needed.
-    if (ibf_idx==0 and index.ibf().ibf_max_kmers(ibf_idx) < kmer_count){ // if we are at the root we might have to split bins.
-              number_of_bins = index.ibf().number_of_bins(ibf_idx, kmer_count);     // calculate among how many bins we should split
-    }
+
     // insert in the first EB encountered. improve using empty bin datastructure and rank operation.
     size_t bin_idx=0;
     for (; bin_idx < ibf_bin_count; bin_idx++){
