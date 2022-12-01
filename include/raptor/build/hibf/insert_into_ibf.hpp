@@ -25,6 +25,14 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      size_t const bin_index,
                      seqan3::interleaved_bloom_filter<> & ibf,
                      bool is_root);
+template <seqan3::data_layout data_layout_mode>
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
+                     robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
+                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                     raptor::hierarchical_interleaved_bloom_filter<data_layout_mode> & index,
+                      seqan3::interleaved_bloom_filter<> & ibf,
+                     bool is_root);
+//alternative using indextriple and index.
 
 template <typename arguments_t> //Myrthe 14.10
 void insert_into_ibf(arguments_t const & arguments,

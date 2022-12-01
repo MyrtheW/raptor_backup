@@ -49,8 +49,14 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
             // initialize lower level IBF
             size_t const max_bin_tbs =
             initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments); // or add max_bin_index
-            auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root); // add is_leaf parameter to define if it
+            auto lower_ibf_idx = ibf_positions[data.node_map[current_node].max_bin_index];
+            auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root, lower_ibf_idx); // add is_leaf parameter to define if it
+            data.hibf.occupancy_table[ibf_pos].resize(ibf.bin_count());
+            data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count());
+            data.hibf.ibf_vector[ibf_pos] = ibf; // I included this here, as it is needed for updating the fpr table during insert_into_ibf. Does this make ata.hibf.ibf_vector[ibf_pos] = std::move(ibf) redundant? Does the ibf in ibf_vector change if the ibf itself changes?
+            insert_into_ibf(parent_kmers, kmers, max_bin_tbs, data.node_map[current_node].max_bin_index, ibf, is_root);
             kmers.clear(); // reduce memory peak
+            // todo fpr is set to inf or 0. not good!
 
             // We assume that max_bin_index corresponds to the first entry in remaining records. Can we also assume that the remaining records are further sorted on size, and based on in what ibf they should go?
             // if yes
@@ -75,15 +81,17 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     {
         auto const & record = current_node_data.remaining_records[i];
         if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // only the first entry of filenames stores something, hence the [0]
-            if (is_root && record.number_of_bins.back() == 1) // no splitting needed
-            {
-                insert_into_ibf(arguments, record, ibf);
-            }
-            else
-            {
+//            if (is_root && record.number_of_bins.back() == 1) // no splitting needed
+//            {
+//                insert_into_ibf(arguments, record, ibf);
+//            }
+//            else
+//            {
+//                compute_kmers(kmers, arguments, record);
+//                insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
+//            }
                 compute_kmers(kmers, arguments, record);
-                insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
-            }
+                insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, (uint64_t) record.bin_indices.back(), (uint64_t) record.number_of_bins.back()), data.hibf, ibf, is_root);
             kmers.clear();
         }
         update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
@@ -98,6 +106,62 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
 //    }
     return ibf_pos;
 }
+//
+//template <seqan3::data_layout data_layout_mode>
+//size_t hierarchical_build2(robin_hood::unordered_flat_set<size_t> & parent_kmers,
+//                          lemon::ListDigraph::Node const & current_node,
+//                          build_data<data_layout_mode> & data,
+//                          build_arguments const & arguments,
+//                          bool is_root) // add argument; (parent_)n_empty_bins input
+//{ // this version of hierarch build loops over by ibf indices and bin indices.
+//    auto & current_node_data = data.node_map[current_node];
+//
+//    size_t const ibf_pos{data.request_ibf_idx()};
+//
+//    std::vector<int64_t> ibf_positions(current_node_data.number_of_technical_bins, ibf_pos);
+//    std::vector<int64_t> filename_indices(current_node_data.number_of_technical_bins, -1);
+//    robin_hood::unordered_flat_set<size_t> kmers{};
+//
+//            // initialize lower level IBF
+//            size_t const max_bin_tbs =
+//            initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments); // or add max_bin_index
+//            auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root); // add is_leaf parameter to define if it
+//            kmers.clear(); // reduce memory peak
+//
+//    // parse all other children (merged bins) of the current ibf
+//    loop_over_children(parent_kmers, ibf, ibf_positions, current_node, data, arguments, is_root);
+//
+//    // If max bin was a merged bin, process all remaining records, otherwise the first one has already been processed
+//    size_t const start{(current_node_data.favourite_child != lemon::INVALID) ? 0u : 1u};
+//    for (size_t i = start; i < current_node_data.remaining_records.size(); ++i)
+//    {
+//        auto const & record = current_node_data.remaining_records[i];
+//        if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // only the first entry of filenames stores something, hence the [0]
+//            if (is_root && record.number_of_bins.back() == 1) // no splitting needed.
+//            {
+//                insert_into_ibf(arguments, record, ibf); // auto const bin_index = seqan3::bin_index{static_cast<size_t>(record.bin_indices.back())};
+//            }
+//            else
+//            {
+//                compute_kmers(kmers, arguments, record);
+//                insert_into_ibf(parent_kmers, kmers, std::make_tuple(ibf_pos, record.number_of_bins.back(), record.bin_indices.back()), is_root);
+//                //insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
+//            }
+//            kmers.clear();
+//        }
+//        update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
+//    }
+//
+//    data.hibf.ibf_vector[ibf_pos] = std::move(ibf);
+//    data.hibf.next_ibf_id[ibf_pos] = std::move(ibf_positions);
+//    data.hibf.user_bins.bin_indices_of_ibf(ibf_pos) = std::move(filename_indices);
+//
+////    break;
+////        }
+////    }
+//    return ibf_pos;
+//}
+
 
 template size_t hierarchical_build<seqan3::data_layout::uncompressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                       lemon::ListDigraph::Node const &,

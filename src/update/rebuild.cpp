@@ -66,9 +66,14 @@ std::vector<std::vector<size_t>> find_best_split(ibf_idx, number_of_splits=2){
 
 
  // METHOD 2
-void split_ibf(size_t ibf_idx,
+void recall_dp(size_t ibf_idx,
                   raptor_index<index_structure::hibf> & index, upgrade_arguments const & arguments)
 {
-
+    //1) obtain filenames from all lower bins
+    // 1.2) and store filenames as text file.
+    //2) creat/extract counts for these filenames by calling Chopper count
+    //3) call Chopper layout on output
+    // Question: is there a big overhead when storing filenames and calling an external programme.
+    //4) more complicated:
 } // namespace raptor
 

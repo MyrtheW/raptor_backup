@@ -7,14 +7,14 @@
 
 #include <raptor/argument_parsing/init_shared_meta.hpp>
 #include <raptor/argument_parsing/parse_bin_path.hpp>
-#include <raptor/argument_parsing/upgrade_parsing.hpp>
+#include <raptor/argument_parsing/update_parsing.hpp>
 #include <raptor/argument_parsing/validators.hpp>
-#include <raptor/upgrade/upgrade.hpp>
+#include <raptor/update/update.hpp>
 
 namespace raptor
 {
 
-void init_upgrade_parser(sharg::parser & parser, upgrade_arguments & arguments)
+void init_update_parser(sharg::parser & parser, upgrade_arguments & arguments)
 {
     init_shared_meta(parser);
 
@@ -59,10 +59,10 @@ void init_upgrade_parser(sharg::parser & parser, upgrade_arguments & arguments)
         sharg::config{.short_id = '\0', .long_id = "hibf", .description = "Index is an HIBF.", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
 }
 
-void upgrade_parsing(sharg::parser & parser)
+void update_parsing(sharg::parser & parser)
 {
     upgrade_arguments arguments{};
-    init_upgrade_parser(parser, arguments);
+    init_update_parser(parser, arguments);
     parser.parse();
 
     // ==========================================
@@ -104,7 +104,7 @@ void upgrade_parsing(sharg::parser & parser)
     // ==========================================
     // Dispatch
     // ==========================================
-    raptor_upgrade(arguments);
+    raptor_update(arguments);
 }
 
 } // namespace raptor

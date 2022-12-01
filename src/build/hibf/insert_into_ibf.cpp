@@ -41,17 +41,18 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
 }
 
 // alternative function that uses index as input,
-
+template <seqan3::data_layout data_layout_mode>
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                      std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
-                     raptor_index<index_structure::hibf> & index,
+                     raptor::hierarchical_interleaved_bloom_filter<data_layout_mode> & index,
+                     seqan3::interleaved_bloom_filter<> & ibf,
                      bool is_root)
 {
     size_t const ibf_idx = std::get<0>(index_triple);
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);
-    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[]
+    //auto& ibf = index.ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] or auto&&
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 
@@ -69,15 +70,29 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
         }
     }
     //size_t kmer_count = kmers.size();
-    index.ibf().update_occupancy_table((size_t) kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
-    auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
+    index.update_occupancy_table((size_t) kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
+    auto fpr = index.update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
 
 }
+
+template void insert_into_ibf<seqan3::data_layout::uncompressed>(robin_hood::unordered_flat_set<size_t> & ,
+                     robin_hood::unordered_flat_set<size_t> const & , // kmers or minimizers
+                     std::tuple <uint64_t, uint64_t, uint16_t> ,
+                     raptor::hierarchical_interleaved_bloom_filter<seqan3::data_layout::uncompressed> & ,
+                              seqan3::interleaved_bloom_filter<> & ,
+                     bool );
+
+template void insert_into_ibf<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> & ,
+                     robin_hood::unordered_flat_set<size_t> const & , // kmers or minimizers
+                     std::tuple <uint64_t, uint64_t, uint16_t> ,
+                     raptor::hierarchical_interleaved_bloom_filter<seqan3::data_layout::compressed> &,
+                              seqan3::interleaved_bloom_filter<> & ,
+                     bool);
 
 template <typename arguments_t> //Myrthe 14.10
 void insert_into_ibf(arguments_t const & arguments,
                      chopper_pack_record const & record,
-                     seqan3::interleaved_bloom_filter<> & ibf)
+                     seqan3::interleaved_bloom_filter<> & ibf) //  edge case when there is no splitting at the root and the function can be simplified (and is probably more efficient than the first, more generic one)
 {
     auto const bin_index = seqan3::bin_index{static_cast<size_t>(record.bin_indices.back())};
 

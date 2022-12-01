@@ -41,12 +41,15 @@ struct build_data
         return std::atomic_fetch_add(&user_bin_number, 1u);
     }
 
-    void resize()
+    void resize() // this function is called in read_chopper_pack_file.cpp
     {
         hibf.ibf_vector.resize(number_of_ibfs);
         hibf.user_bins.set_ibf_count(number_of_ibfs);
         hibf.user_bins.set_user_bin_count(number_of_user_bins);
         hibf.next_ibf_id.resize(number_of_ibfs);
+        hibf.occupancy_table.resize(number_of_ibfs);
+        hibf.fpr_table.resize(number_of_ibfs);
+
     }
 
     void compute_fp_correction(size_t const tmax, size_t const hash, double const fpr)

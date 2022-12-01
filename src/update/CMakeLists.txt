@@ -4,5 +4,6 @@ add_library ("raptor_update" STATIC
         raptor_update.cpp
         load_hibf.cpp
         insertions.cpp
+        #rebuild.cpp
         )
 target_link_libraries ("raptor_update" PUBLIC "raptor_interface")

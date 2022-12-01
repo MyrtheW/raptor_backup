@@ -18,6 +18,8 @@ void load_hibf(upgrade_arguments const & arguments) // perhaps better to have in
     index.ibf().initialize_previous_ibf_id(); //
     // create datastructure for perfect ns.
 
+    // make sure that the necessary data structures are loaded/created.
+
     if constexpr (not compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
         update_hibf(arguments, index); // currently requires uncompressed type?  requires (compressed == false)
     }
