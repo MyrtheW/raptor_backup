@@ -12,6 +12,6 @@
 namespace raptor
 {
 
-void upgrade_parsing(sharg::parser & parser);
+void update_parsing(sharg::parser & parser);
 
 } // namespace raptor

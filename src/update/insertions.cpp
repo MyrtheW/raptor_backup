@@ -67,7 +67,7 @@ void delete_ub(std::vector<std::string> const & filename,
         size_t const ibf_idx = std::get<0>(index_triple);
         size_t const start_bin_idx = std::get<1>(index_triple);
         size_t const number_of_bins = std::get<2>(index_triple);
-        index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins)
+        index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins);
         }
     index.ibf().user_bins.delete_filename(filename[0]);  // update filename tables. even if the UB did not exist, it might have been added through the STL .find() function.
 }
@@ -101,7 +101,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
     }
     }
 
-std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t ibf_idx, size_t number_of_bins=1){
+std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t ibf_idx, size_t number_of_bins){
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
 
 
@@ -118,13 +118,15 @@ std::tuple <uint64_t, uint64_t>  find_empty_bin_idx(raptor_index<index_structure
     } // if the whole loop is run through, no appropiate empty bin is found and the bin idx will be the size of the IBF.
     if (bin_idx == ibf_bin_count){// then there is no empty bin. Resize IBF .  or ibf.bin_count()
         double EB_percentage = 0.1;
+        // or splitting rebuild.
         size_t new_ibf_bin_count = std::max((size_t) std::round((1+EB_percentage)*ibf_bin_count), ibf_bin_count + number_of_bins);
         // should best be a multiple of 64. Make sure that when calling void increase_bin_number_to(bin_count const new_bins_), it increases.
         index.ibf().ibf_vector[ibf_idx].increase_bin_number_to((seqan3::bin_count) new_ibf_bin_count);
         index.ibf().resize_ibf_occupancy_table(ibf_idx, new_ibf_bin_count);
         index.ibf().resize_ibf_fpr_table(ibf_idx, new_ibf_bin_count);
-        index.ibf().resize_ibf_filename_positions(ibf_idx, new_ibf_bin_count);
-       // you don't have to update the next_ibf_id or previous_ibf_id . Check if a resize is needed for any of the other filename related datastructures.
+        //index.ibf().resize_ibf_filename_positions(ibf_idx, new_ibf_bin_count);
+
+        // you don't have to update the next_ibf_id or previous_ibf_id . Check if a resize is needed for any of the other filename related datastructures.
 
 //            void resize_ibf_filename_positions(size_t ibf_idx, size_t new_bin_count){
 //        assert(new_bin_count >= occupancy_table[ibf_idx].size()); // check that new bin count is larger then the size. --> actually this is allowed to

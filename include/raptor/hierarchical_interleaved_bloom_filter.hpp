@@ -190,7 +190,7 @@ public:
         for (size_t bin_idx; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){
             //filename = filenames_ibf[bin_idx];
             if (is_merged_bin(ibf_idx, bin_idx)){
-                std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx, bin_idx]); // add this set to filenames
+                std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx][bin_idx]); // add this set to filenames
                 std::merge(filenames.begin(), filenames.end(), filenames_mb.begin(), filenames_mb.end(), std::inserter(filenames, filenames.begin()));
             }else{ // recursively for merged bins.
                 filenames.insert(user_bins[(ibf_idx, bin_idx)]);
@@ -286,10 +286,10 @@ public:
         assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
         fpr_table[ibf_idx].resize(new_bin_count);
     }
-    void resize_hibf_fpr_table(size_t ibf_idx, size_t new_ibf_size){ //add new IBF to last index, with a vector of the size of the new IBF.
-        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
-        fpr_table.resize(fpr_table.size()+1);
-    }
+//    void resize_hibf_fpr_table(size_t ibf_idx, size_t new_ibf_size){ //add new IBF to last index, with a vector of the size of the new IBF.
+//        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
+//        fpr_table.resize(fpr_table.size()+1);
+//    }
 
 // function for adding new ibf to the above
 

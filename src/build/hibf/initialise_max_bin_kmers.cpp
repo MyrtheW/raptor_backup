@@ -29,7 +29,7 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
     {
         // recursively initialize favourite child first
         ibf_positions[node_data.max_bin_index] =
-            hierarchical_build(kmers, node_data.favourite_child, data, arguments, false); // add argument; (parent_)n_empty_bins input
+            hierarchical_build(kmers, node_data.favourite_child, data, arguments, false); // add argument; (parent_)n_empty_bins input ?
         return 1;
     }
     else // max bin is not a merged bin

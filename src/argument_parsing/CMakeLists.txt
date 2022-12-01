@@ -6,7 +6,7 @@ add_library ("raptor_argument_parsing" STATIC
              init_shared_meta.cpp
              parse_bin_path.cpp
              search_parsing.cpp
-             upgrade_parsing.cpp
+             #upgrade_parsing.cpp
              update_parsing.cpp
 )
 
