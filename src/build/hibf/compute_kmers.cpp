@@ -53,7 +53,7 @@ void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
 template void compute_kmers<build_arguments>(robin_hood::unordered_flat_set<size_t> & kmers, //Myrthe 14.10
                    build_arguments const & arguments,
                    chopper_pack_record const & record);
-template void compute_kmers<upgrade_arguments>(robin_hood::unordered_flat_set<size_t> & kmers,
-                   upgrade_arguments const & arguments,
+template void compute_kmers<update_arguments>(robin_hood::unordered_flat_set<size_t> & kmers,
+                   update_arguments const & arguments,
                    chopper_pack_record const & record);
 } // namespace raptor::hibf

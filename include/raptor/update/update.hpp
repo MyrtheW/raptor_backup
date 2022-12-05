@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <raptor/argument_parsing/upgrade_arguments.hpp>
+#include <raptor/argument_parsing/update_arguments.hpp>
 
 namespace raptor
 {
 
-void raptor_update(upgrade_arguments const & arguments);
+void raptor_update(update_arguments const & arguments);
 
 } // namespace raptor

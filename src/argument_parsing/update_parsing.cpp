@@ -14,7 +14,7 @@
 namespace raptor
 {
 
-void init_update_parser(sharg::parser & parser, upgrade_arguments & arguments)
+void init_update_parser(sharg::parser & parser, update_arguments & arguments)
 {
     init_shared_meta(parser);
 
@@ -57,11 +57,26 @@ void init_update_parser(sharg::parser & parser, upgrade_arguments & arguments)
     parser.add_flag(
         arguments.is_hibf,
         sharg::config{.short_id = '\0', .long_id = "hibf", .description = "Index is an HIBF.", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
+
+        // make sure that one of the options, delete UBs, insert UBs, insert sequences or delete sequences is chosen.
+    parser.add_flag(
+        arguments.delete_ubs,
+        sharg::config{.short_id = '\0', .long_id = "delete-UBs", .description = "Delete user bins. Provide filenames of the user bins to be deleted", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
+    parser.add_flag(
+        arguments.insert_ubs,
+        sharg::config{.short_id = '\0', .long_id = "insert-UBs", .description = "Insert user bins. Provide filenames of the user bins to be inserted", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
+    parser.add_flag(
+        arguments.insert_sequences,
+        sharg::config{.short_id = '\0', .long_id = "insert-sequences", .description = "Insert sequences user bins. Provide filenames of the user bins to be inserted into. Also make sure that in the same location files exists with UB_filename_insertsequence.txt", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
+    parser.add_flag(
+        arguments.delete_sequences,
+        sharg::config{.short_id = '\0', .long_id = "delete-sequences", .description = "Insert sequences user bins. Provide filenames of the user bins to be inserted into. Also make sure that in the same location files exists with UB_filename_insertsequence.txt", .advanced = true}); // should we also require the fpr as input? it should be deduced from the datastruct?
+
 }
 
 void update_parsing(sharg::parser & parser)
 {
-    upgrade_arguments arguments{};
+    update_arguments arguments{};
     init_update_parser(parser, arguments);
     parser.parse();
 

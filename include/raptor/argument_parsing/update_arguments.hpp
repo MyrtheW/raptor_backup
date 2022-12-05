@@ -15,7 +15,7 @@
 namespace raptor
 {
 
-struct upgrade_arguments
+struct update_arguments
 { // todo check which arguments are needed for updating
     uint32_t window_size{};
     uint8_t kmer_size{};
@@ -23,6 +23,10 @@ struct upgrade_arguments
     uint8_t parts{1u};
     bool compressed{false};
     bool is_hibf{false};
+    bool delete_ubs{false};
+    bool insert_ubs{false};
+    bool insert_sequences{false};
+    bool delete_sequences{false};
 
     std::filesystem::path bin_file{};
     std::filesystem::path in_file{};
