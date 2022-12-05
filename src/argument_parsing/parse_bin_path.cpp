@@ -68,5 +68,8 @@ void parse_bin_path(upgrade_arguments & arguments)
 {
     raptor::detail::parse_bin_path(arguments.bin_file, arguments.bin_path, false, false);
 }
-
+void parse_bin_path(update_arguments & arguments)
+{
+    raptor::detail::parse_bin_path(arguments.bin_file, arguments.bin_path, false, false);
+}
 } // namespace raptor

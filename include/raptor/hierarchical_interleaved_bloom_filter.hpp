@@ -232,12 +232,12 @@ public:
      * \author Myrthe
      * \comment It might be computationally faster to work with log2 fpr values, to prevent the power to the h
      */
-    double approximate_fpr(size_t & m, size_t & n, size_t & h){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
+    double approximate_fpr(int m, int n, int h){// doesn't work with reference & // n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
        // when actually using deleted kmers, these need to be stored somewhere, and the value alphabet**k should be pre computed.
-        return pow((1-exp(-h*n/m)), h); // - deleted_kmers/(alphabet**k)
+        return pow((1-exp((double)-h*n/m)), h); // - deleted_kmers/(alphabet**k)
     }
 
-    double approximate_fpr(size_t & m, size_t & n, size_t & h, size_t & s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
+    double approximate_fpr(int m, int n, int h, int s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
         return (1-pow(1 - approximate_fpr(m,n,h), s)); // - deleted_kmers/(alphabet**k)
     }
 
@@ -250,15 +250,21 @@ public:
      * \author Myrthe
      */
     double update_fpr(size_t ibf_idx, size_t bin_idx, size_t number_of_bins = 1)
-    {
-        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
-        auto kmer_count = occupancy_table[ibf_idx][bin_idx];
-        auto bin_size = ibf.bin_size();
-        auto hash_funs = ibf.hash_function_count();
-        auto fpr = approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
+    {   auto kmer_count = occupancy_table[ibf_idx][bin_idx];
+        double fpr;
+        if (kmer_count==0){
+           fpr=0;
+        }else{
+            auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
+            auto bin_size = ibf.bin_size();
+            auto hash_funs = ibf.hash_function_count();
+            fpr = approximate_fpr((int) bin_size, (int) kmer_count, (int) hash_funs, (int) number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
+        }
         for (size_t offset=0; offset < number_of_bins; offset++){  //loop over split bins and add multiple testing correction
             fpr_table[ibf_idx][bin_idx+offset] = fpr;
         }
+        assert(fpr<1);
+        assert(fpr>=0);
         return fpr;
     }
 
@@ -300,7 +306,7 @@ public:
         return approximate_kmer_capacity(bin_size, fpr, hash_funs);
     }
 
-    size_t approximate_kmer_capacity(size_t & m, double & fpr, size_t & h) //max number of kmers that fits in a TB, a value specific to an IBF
+    size_t approximate_kmer_capacity(int m, double & fpr, int h) //max number of kmers that fits in a TB, a value specific to an IBF
     // -> (although for split bins also possible, taking into account fpr correction)
     // -> should also possibly take into account fpr rate of merged bin above.
     {
@@ -308,13 +314,13 @@ public:
     } // can be a property stored per ibf, so it does not need to be recalculated. (Can be 0 for empty IBFs)
         // bin_size_in_bits https://github.com/seqan/raptor/blob/7fe02401bb4f191e2ef4e1454ea9a1c7756816ca/src/build/hibf/bin_size_in_bits.cpp can be used to calculate m from fpr, n and h
 
-    size_t number_of_bins(size_t ibf_idx, size_t kmer_count,  double fpr=0.05){
+    size_t number_of_bins(size_t ibf_idx, int kmer_count,  double fpr=0.05){
         // given an ibf, with a certain bin size, how many technical bins are needed to store a certain number of kmers, considering the multiple testing problem?
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
-        size_t bin_size = ibf.bin_size();
-        size_t hash_funs = ibf.hash_function_count();
-        size_t number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx));         // first guess
-        while (approximate_fpr(bin_size, kmer_count, hash_funs, number_of_bins) > fpr){
+        int bin_size = ibf.bin_size();
+        int hash_funs = ibf.hash_function_count();
+        int number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx));         // first guess
+        while (approximate_fpr(bin_size, (int) kmer_count, hash_funs, number_of_bins) > fpr){
             number_of_bins++;
         }
         return number_of_bins;
@@ -355,6 +361,9 @@ public:
         archive(ibf_vector);
         archive(next_ibf_id);
         archive(user_bins);
+        archive(occupancy_table);
+        archive(fpr_table);
+        archive(previous_ibf_id);
     }
     //!\endcond
 };

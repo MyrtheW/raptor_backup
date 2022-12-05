@@ -22,8 +22,8 @@ if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of exi
     // one possible outcome might be that a new layout is made.this now happens in insert_into_ibf.
     //METHOD 1
     size_t root_idx = 0; // would assume so based on bulk_contains_impl
-    size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx);
-        size_t number_of_bins = 1; // calculate number of user bins needed.
+    size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // OR OTHER FIND LOCATION ALGORITHM
+    size_t number_of_bins = 1; // calculate number of user bins needed.
     if (ibf_idx==0 and index.ibf().ibf_max_kmers(ibf_idx) < kmer_count){ // if we are at the root we might have to split bins.
               number_of_bins = index.ibf().number_of_bins(ibf_idx, kmer_count);     // calculate among how many bins we should split
     }
@@ -34,7 +34,19 @@ if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of exi
     }
 }
 
-void update_hibf(upgrade_arguments const & arguments,
+void insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers, std::tuple <uint64_t, uint64_t, uint16_t> & index_triple,
+                  raptor_index<index_structure::hibf> & index){
+// the while loop was inifinte, because if we are at the root the std::get<0>(index_triple) =0
+//    while (std::get<0>(index_triple) != index.ibf().ibf_vector.size()){             // loop over parents to also insert the kmers in merged bins.
+    insert_into_ibf(kmers, index_triple, index); // add to HIBF. If at some point the IBF will be rebuild, then make sure that kmers stay the same. . The next step will be fine, as you only need the index of the IBF, and the IBF that is rebuild only grows. However, this approach is inefficient if it would trigger again a rebuild on the next level.
+    if (std::get<0>(index_triple) != 0){
+                auto index_tuple = index.ibf().previous_ibf_id[std::get<0>(index_triple)]; // update index triple:
+                index_triple = std::make_tuple(std::get<0>(index_tuple), std::get<1>(index_tuple), 1); // number of bins will be 1 for the merged bins (i assume)
+    }
+    kmers.clear();
+}
+
+void update_hibf(update_arguments const & arguments,
                   raptor_index<index_structure::hibf> & index)   //std::move is not correct to use here. https://stackoverflow.com/questions/3413470/what-is-stdmove-and-when-should-it-be-used
 {
     robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
@@ -42,18 +54,77 @@ void update_hibf(upgrade_arguments const & arguments,
             raptor::hibf::compute_kmers(kmers, arguments, filename); // or  std::vector<std::string> filename2 = {{filename}};
             size_t kmer_count = kmers.size();
             std::tuple <uint64_t, uint64_t, uint16_t> index_triple = get_location(filename, kmer_count, index);       //  index_triple; bin_idx, ibf_idx, number_of_bins
-            while (std::get<0>(index_triple) != index.ibf().ibf_vector.size()){             // loop over parents to also insert the kmers in merged bins.
-                insert_into_ibf(kmers, index_triple, index); // add to HIBF. If at some point the IBF will be rebuild, then make sure that kmers stay the same. . The next step will be fine, as you only need the index of the IBF, and the IBF that is rebuild only grows. However, this approach is inefficient if it would trigger again a rebuild on the next level.
-                auto index_tuple = index.ibf().previous_ibf_id[std::get<0>(index_triple)]; // update index triple:
-                index_triple = std::make_tuple(std::get<0>(index_tuple), std::get<1>(index_tuple), 1); // number of bins will be 1 for the merged bins (i assume)
+            insert_tb_and_parents(kmers,  index_triple, index);
+    }
+}
+
+/////////////////////////////////////////
+
+
+//INSERT SEQUENCES
+void insert_sequences(update_arguments const & arguments,
+                  raptor_index<index_structure::hibf> & index)   //std::move is not correct to use here. https://stackoverflow.com/questions/3413470/what-is-stdmove-and-when-should-it-be-used
+{
+    robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
+    for  (auto &filename: arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
+            // check if filename exists in the UBs
+        if (not index.ibf().user_bins.exists_filename(filename[0])){ // Find location of existing user bin, inserts it if it does not exist yet.
+            std::cout << "The user bin ... that you want to insert to does not exist. If you want to add a new user bin, use the flag -insert-UB";
+        }else{
+                std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
+                // check if filename_insertsequences exits as a file using validate function?
+//                const std::basic_string<char> appendix2= "_insertsequences";
+//                const std::basic_string<char>& appendix = "_insertsequences";
+//                // const basic_string& __str
+//                const std::string & filename2 = (const std::string &) filename[0];
+//                filename2.append(filename2);
+//                "test".append("test");
+//                appendix.append("hi");
+//                (filename[0]).append((std::basic_string<char>)reinterpret_cast<const char *>('_insertsequences'));
+//                (filename[0]).string("_insertsequences");
+//                  filename[0].append(appendix);
+//https://cplusplus.com/reference/string/basic_string/append/
+// Question: how do I do this?
+
+                //filename[0].append("_insertsequences");
+                raptor::hibf::compute_kmers(kmers, arguments, filename); // or  std::vector<std::string> filename2 = {{filename}};
+                insert_tb_and_parents(kmers,  index_triple, index);
+                // todo check if rebuild is required
             }
-            kmers.clear();
+
     }
 }
 
 
+//DELETE SEQUENCES
+void delete_sequences(update_arguments const & arguments,
+                  raptor_index<index_structure::hibf> & index)   //std::move is not correct to use here. https://stackoverflow.com/questions/3413470/what-is-stdmove-and-when-should-it-be-used
+{
+    robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
+    for  (auto &filename: arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
+        if (not index.ibf().user_bins.exists_filename(filename[0])){ //            // check if filename exists in the UBs
+            std::cout << "The user bin ... that you want to insert to does not exist. If you want to add a new user bin, use the flag -insert-UB";
+        }else{
+                std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
+                //filename[0].append("_deletesequences");
+                raptor::hibf::compute_kmers(kmers, arguments, filename); // or  std::vector<std::string> filename2 = {{filename}};
+                //update occupancy table
+                // check if rebuild is required --> rebuild the UB rather than splitting it.
+            }
 
-//DELETE UB
+    }
+}
+
+//DELETE UBS
+void delete_ubs(update_arguments const & arguments,
+                  raptor_index<index_structure::hibf> & index)   //std::move is not correct to use here. https://stackoverflow.com/questions/3413470/what-is-stdmove-and-when-should-it-be-used
+{
+    for  (auto &filename: arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
+            delete_ub(filename, index);
+    }
+}
+
+
 void delete_ub(std::vector<std::string> const & filename,
                     raptor_index<index_structure::hibf> & index){
 
@@ -78,7 +149,7 @@ void delete_ub(std::vector<std::string> const & filename,
 
 //TRAVERSE HIBF
 size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_structure::hibf> & index, size_t ibf_idx){
-    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[]
+    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] auto test = index.ibf().ibf_max_kmers(ibf_idx); //todo remove
     if (index.ibf().ibf_max_kmers(ibf_idx) > kmer_count){ // kmer-capacity of IBF > bin size new UB, go down if possible. Instead of maximal capcity, you can calculate the optimal kmer_ size.
         size_t best_mb_idx = ibf.bin_count(); double best_fpr = 1; // initialize the best idx outside of the ibf, such that we can use this after the loop to check if a MB was found.
          for (size_t bin_idx; bin_idx < ibf.bin_count(); ++bin_idx){ //loop over bins to find the bext merged bin
@@ -90,7 +161,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
                 }
             }
          }
-         if (best_mb_idx > ibf.bin_count()){ //no merged bins, only leaf bins exist on this level.
+         if (best_mb_idx >= ibf.bin_count()){ //no merged bins, only leaf bins exist on this level.
              return ibf_idx;
          }else{
              auto next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][best_mb_idx]; //next_ibf_id[ibf_id_high].size()

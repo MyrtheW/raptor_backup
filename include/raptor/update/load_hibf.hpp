@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include "raptor/argument_parsing/upgrade_arguments.hpp"
+#include "raptor/argument_parsing/update_arguments.hpp"
 
 namespace raptor
 {
 template <bool compressed>
-void load_hibf(upgrade_arguments const & arguments);
+void load_hibf(update_arguments const & arguments);
 } // namespace raptor
