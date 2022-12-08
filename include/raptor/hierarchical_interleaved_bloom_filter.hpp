@@ -10,6 +10,7 @@
 #include <ranges>
 
 #include <seqan3/search/dream_index/interleaved_bloom_filter.hpp>
+#include <cereal/types/tuple.hpp>
 
 #ifndef RAPTOR_HIBF_HAS_COUNT
 #    define RAPTOR_HIBF_HAS_COUNT 0
@@ -130,7 +131,7 @@ public:
           * \author Myrthe
 
      */
-    std::vector<std::tuple<int64_t, int64_t>> previous_ibf_id;
+    std::vector<std::tuple<size_t, size_t>> previous_ibf_id;
 
     //!\brief The table with FPR or occupancy values, [ibf_idx][bin_idx]
     std::vector<std::vector<double>> fpr_table;
@@ -212,7 +213,7 @@ public:
             for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); bin_idx++){
                 uint64_t ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
                 if (ibf_id_low != ibf_id_high){ // it might happen that ibf_id_low == ibf_id_high for LBs, and we should not overwrite the entry.
-                     previous_ibf_id[ibf_id_low] = std::make_tuple(ibf_id_high, bin_idx);
+                     previous_ibf_id[ibf_id_low] = std::make_tuple((size_t) ibf_id_high, (size_t) bin_idx);
                 }
             }
         }
