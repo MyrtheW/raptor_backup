@@ -139,6 +139,12 @@ public:
     //!\brief The table with FPR or occupancy values, [ibf_idx][bin_idx]
     std::vector<std::vector<size_t>> occupancy_table; // again it may make more sense to have this as part of ibf_vector, interleaved_bloom_filter does not belong to this project.
 
+    //!\brief Maximum false positive rate for any user bin.
+    double fpr_max;
+
+    //!\brief maximum (or optimal) number of k-mers that IBF could hold at that moment.
+    std::vector<size_t> ibf_sizes;
+
     //!\brief The underlying user bins.
     user_bins user_bins;
 
@@ -188,7 +194,7 @@ public:
         // find the filenames of all leaves of a certain merged bin.
         std::set<std::string> filenames; // add user_bins[ibf_idx] to set.
         //filenames_ibf = user_bins[ibf_idx];
-        for (size_t bin_idx; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){
+        for (size_t bin_idx=0; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){
             //filename = filenames_ibf[bin_idx];
             if (is_merged_bin(ibf_idx, bin_idx)){
                 std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx][bin_idx]); // add this set to filenames
@@ -280,11 +286,32 @@ public:
         }
     }
 
+    int get_occupancy_file(std::string & filename){
+        std::tuple <uint64_t, uint64_t, uint16_t> index_triple = user_bins.find_filename(filename);
+        size_t const ibf_idx = std::get<0>(index_triple);
+        size_t const bin_idx = std::get<1>(index_triple);
+        size_t const number_of_bins = std::get<2>(index_triple);
+        int occupancy_per_file = 0;
+        for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
+            occupancy_per_file += occupancy_table[ibf_idx][bin_idx + offset];
+        }
+        return occupancy_per_file;
+    }
         /*!\brief Update false positive rate of a TB.
      * \details Calculates the approximate false positive rate of a certain technical bin, given its indices in the HIBF, using the approximate_fpr function and updates .
 
      * \author Myrthe
      */
+
+        //RESIZE IBF
+    void resize_ibf(size_t ibf_idx, size_t bin_count){ //details resize Ibf and datastructures. perhaps move to HIBF.hpp
+        ibf_vector[ibf_idx].increase_bin_number_to((seqan3::bin_count) bin_count);
+        resize_ibf_occupancy_table(ibf_idx, bin_count);
+        resize_ibf_fpr_table(ibf_idx, bin_count);
+        user_bins.resize_ibf_filename_positions(ibf_idx, bin_count); // perhaps also update ibf_bin_to_filename_position
+        // you don't have to update the next_ibf_id or previous_ibf_id .
+    }
+
     void resize_ibf_occupancy_table(size_t ibf_idx, size_t new_bin_count){
         assert(new_bin_count >= occupancy_table[ibf_idx].size()); // check that new bin count is larger then the size.
         occupancy_table[ibf_idx].resize(new_bin_count);
@@ -293,6 +320,10 @@ public:
         assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
         fpr_table[ibf_idx].resize(new_bin_count);
     }
+
+
+
+//RESIZE HIBF
 //    void resize_hibf_fpr_table(size_t ibf_idx, size_t new_ibf_size){ //add new IBF to last index, with a vector of the size of the new IBF.
 //        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
 //        fpr_table.resize(fpr_table.size()+1);
@@ -300,20 +331,27 @@ public:
 
 // function for adding new ibf to the above
 
-    double ibf_max_kmers(size_t ibf_idx, double fpr=0.05){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
+
+    double ibf_max_kmers(size_t ibf_idx){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
         size_t bin_size = ibf.bin_size();
         size_t hash_funs = ibf.hash_function_count();//arguments.hash
-        return approximate_kmer_capacity(bin_size, fpr, hash_funs);
+        return approximate_kmer_capacity(bin_size, fpr_max, hash_funs);
     }
 
     size_t approximate_kmer_capacity(int m, double & fpr, int h) //max number of kmers that fits in a TB, a value specific to an IBF
     // -> (although for split bins also possible, taking into account fpr correction)
     // -> should also possibly take into account fpr rate of merged bin above.
     {
-        return std::floor((m*log(1-pow(fpr, 1/h))/h));
+        return -std::floor((m*log(1-pow(fpr, (double) 1/h))/h));
     } // can be a property stored per ibf, so it does not need to be recalculated. (Can be 0 for empty IBFs)
         // bin_size_in_bits https://github.com/seqan/raptor/blob/7fe02401bb4f191e2ef4e1454ea9a1c7756816ca/src/build/hibf/bin_size_in_bits.cpp can be used to calculate m from fpr, n and h
+
+    void initialize_ibf_sizes(bool max_size=true){
+        for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
+            ibf_sizes[ibf_idx] = ibf_max_kmers(ibf_idx);
+        }
+    }
 
     size_t number_of_bins(size_t ibf_idx, int kmer_count,  double fpr=0.05){
         // given an ibf, with a certain bin size, how many technical bins are needed to store a certain number of kmers, considering the multiple testing problem?
@@ -417,6 +455,12 @@ public:
             }
         }
 
+    }
+
+    //when resizing the ibf.
+    void resize_ibf_filename_positions(size_t ibf_idx, size_t new_bin_count){
+        assert(new_bin_count >= ibf_bin_to_filename_position[ibf_idx].size()); // check that new bin count is larger then the size.
+        ibf_bin_to_filename_position[ibf_idx].resize(new_bin_count); //if allowed... private attribute
     }
 
     /*!\brief Returns the bin and IBF indices within the HIBF of a given user bin, specified by filename.

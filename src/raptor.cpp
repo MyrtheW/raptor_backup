@@ -59,7 +59,7 @@ int main(int argc, char ** argv)
 
 //        if (sub_parser.info.app_name == std::string_view{"raptor-upgrade"})
 //            raptor::upgrade_parsing(sub_parser);
-        if (sub_parser.info.app_name == std::string_view{"raptor-update"})
+        if (sub_parser.info.app_name == std::string_view{"Raptor-update"})
             raptor::update_parsing(sub_parser);
     }
     catch (sharg::parser_error const & ext)

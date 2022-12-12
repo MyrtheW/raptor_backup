@@ -68,12 +68,28 @@ std::vector<std::vector<size_t>> find_best_split(ibf_idx, number_of_splits=2){
  // METHOD 2
 void recall_dp(size_t ibf_idx,
                   raptor_index<index_structure::hibf> & index, upgrade_arguments const & arguments)
-{
-    //1) obtain filenames from all lower bins
-    // 1.2) and store filenames as text file.
-    //2) creat/extract counts for these filenames by calling Chopper count
-    //3) call Chopper layout on output
-    // Question: is there a big overhead when storing filenames and calling an external programme.
-    //4) more complicated:
+{    // first do it without updating hyper loglog (sketch_directory, chopper_sketch_sketches) Perhaps use config from layout file. --> shows the count_filename and sketch_directory.
+
+    //1) obtain filenames from all lower bins and kmer counts. Perhaps using occupancy table.
+    // 1.2) and store filenames as text file., with count_filename = "chopper_sketch.count"
+   get_kmer_counts(index, arguments);
+    //3) call Chopper layout on output,
+    //see test file in chopper, which call execute.
+}
+
+// store kmer/minimizer counts for each filename
+void get_kmer_counts(raptor_index<index_structure::hibf> & index, upgrade_arguments const & arguments){
+    // alternatively, create/extract counts for these filenames by calling Chopper count
+    // clear the count file first, with count_filename = "chopper_sketch.count"
+
+    for (auto & filename : index.bin_path()){        //for (auto & filename : index.ibf().user_bins){// for each file in index.user_bins, perhaps I have to use .user_bin_filenames, but this is private... or index.filenames
+        if (std::filesystem::path(filename).extension() !=".empty_bin"){
+                index.ibf().get_occupancy_file(filename);
+                write_count_file_line(cluster_vector[i], weight, fout); // function in chopper, to store filenames to the text file.
+        }
+
+    }
+}
+
 } // namespace raptor
 

@@ -136,7 +136,7 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 namespace raptor{
 
      //Myrthe
-// write comments
+// write comments. this version is only used for updating.
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                     raptor_index<index_structure::hibf> & index) // only if IBF is uncompressed.
@@ -168,8 +168,9 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
 
 
     // todo:
-    //        if (fpr  > threshold){
-    //        Rebuild!
+    // 1)  assert that fpr < fpr max, if UB was inserted in a LB, leaf TB.
+    // 2)        if (fpr  > threshold){
+    //        Rebuild! (when splitting-rebuilding, passing on parent k-mers). for relayout, only do it afterwards
     //        }
 
 }

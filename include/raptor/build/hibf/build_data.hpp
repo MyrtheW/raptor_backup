@@ -49,6 +49,7 @@ struct build_data
         hibf.next_ibf_id.resize(number_of_ibfs);
         hibf.occupancy_table.resize(number_of_ibfs);
         hibf.fpr_table.resize(number_of_ibfs);
+        //hibf.ibf_sizes.resize(number_of_ibfs);
 
     }
 
