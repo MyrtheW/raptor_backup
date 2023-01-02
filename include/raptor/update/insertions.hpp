@@ -25,4 +25,6 @@ namespace raptor
                   raptor_index<index_structure::hibf> & index);
     void delete_ub(std::vector<std::string> const & filename,
                     raptor_index<index_structure::hibf> & index);
+    size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t> & kmers,  raptor_index<index_structure::hibf> & index, size_t ibf_idx=0);
+
 }

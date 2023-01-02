@@ -5,10 +5,10 @@
 
 namespace raptor
 {
-   // using index_structure_t = std::conditional_t<seqan3::compressed, index_structure::hibf_compressed, index_structure::hibf>;
+// using index_structure_t = std::conditional_t<seqan3::compressed, index_structure::hibf_compressed, index_structure::hibf>;
 //template<bool compressed>
 std::tuple <uint64_t, uint64_t, uint16_t> get_location(std::vector<std::string> const & filename,
-                                                       size_t kmer_count,
+                                                       size_t kmer_count, robin_hood::unordered_flat_set<size_t> &kmers,
                                                        raptor_index<index_structure::hibf> & index){
     // test:  only return {0,0,0} see if the issue still occurs without calling all functions.
 //bool x = index.ibf().user_bins.exists_filename(filename);
@@ -19,8 +19,8 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(std::vector<std::string> 
     // one possible outcome might be that a new layout is made.this now happens in insert_into_ibf.
     //METHOD 1
     size_t root_idx = 0; // would assume so based on bulk_contains_impl
-
-    size_t ibf_idx = find_ibf_idx_ibf_size(kmer_count, index); // OR OTHER FIND LOCATION ALGORITHM
+    size_t ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
+    //size_t ibf_idx = find_ibf_idx_ibf_size(kmer_count, index); // OR OTHER FIND LOCATION ALGORITHM
     //size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // OR OTHER FIND LOCATION ALGORITHM
     size_t number_of_bins = 1; // calculate number of user bins needed.
     if (ibf_idx==0 and index.ibf().ibf_max_kmers(ibf_idx) < kmer_count){ // if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
@@ -31,6 +31,8 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(std::vector<std::string> 
 
     return index_triple;
     }
+
+
 
 
 void insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers, std::tuple <uint64_t, uint64_t, uint16_t> & index_triple,
@@ -55,7 +57,7 @@ void insert_ubs(update_arguments const & arguments,
             }else{
                 raptor::hibf::compute_kmers(kmers, arguments, filename); // or  std::vector<std::string> filename2 = {{filename}};
                 size_t kmer_count = kmers.size();
-                std::tuple <uint64_t, uint64_t, uint16_t> index_triple = get_location(filename, kmer_count, index);       //  index_triple; bin_idx, ibf_idx, number_of_bins
+                std::tuple <uint64_t, uint64_t, uint16_t> index_triple = get_location(filename, kmer_count, kmers, index);       //  index_triple; bin_idx, ibf_idx, number_of_bins
                 insert_tb_and_parents(kmers,  index_triple, index);
             }
     }
@@ -227,6 +229,48 @@ size_t find_ibf_idx_ibf_size(size_t & kmer_count, raptor_index<index_structure::
         }
         return low;  // key not found. or low +1 ?
     }
+
+//TRAVERSE HIBF by MB similarity
+size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t> & kmers, raptor_index<index_structure::hibf> & index, size_t ibf_idx){ //default is root_idx =0, where we start the search.
+    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] auto test = index.ibf().ibf_max_kmers(ibf_idx); //todo remove
+    if (index.ibf().ibf_max_kmers(ibf_idx) > kmers.size()){ // kmer-capacity of IBF > bin size new UB, go down if possible. Instead of maximal capcity, you can calculate the optimal kmer_ size.
+
+        auto agent = ibf.template counting_agent<uint16_t>();
+        auto & result = agent.bulk_count(kmers); // count occurace of the kmers in each of the bins in the current IBF.
+
+        size_t best_mb_idx = ibf.bin_count(); int best_similarity = -1; // initialize the best idx outside of the ibf, such that we can use this after the loop to check if a MB was found.
+        for (size_t bin_idx=0; bin_idx < ibf.bin_count(); ++bin_idx){ //loop over bins to find the bext merged bin
+            if (index.ibf().is_merged_bin(ibf_idx, bin_idx)){
+                auto similarity = result[bin_idx];
+                if (similarity > best_similarity){
+                    best_similarity = similarity;
+                    best_mb_idx = bin_idx;
+                }
+            }
+        }
+        if (best_mb_idx >= ibf.bin_count()){ //no merged bins, only leaf bins exist on this level.
+            return ibf_idx;
+        }else{
+            auto next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][best_mb_idx]; //next_ibf_id[ibf_id_high].size()
+            return (find_ibf_idx_traverse_by_similarity(kmers, index, next_ibf_idx));
+        }
+    }else{ // kmer-capacity of IBF < bin size new UB, go up if possible
+        return(std::get<0>(index.ibf().previous_ibf_id[ibf_idx])); //ibf idx of merged bin a level up. If it is a root, it will automatically return the root index = 0
+    }
+}
+//template <std::ranges::forward_range value_range_t>
+//    void bulk_contains_impl(value_range_t && values, int64_t const ibf_idx, size_t const threshold)
+//    {
+//        auto agent = hibf_ptr->ibf_vector[ibf_idx].template counting_agent<uint16_t>();
+//        auto & result = agent.bulk_count(values);
+//
+//
+//        for (size_t bin{}; bin < result.size(); ++bin)
+//        {
+//            sum += result[bin];
+
+
+
 
 
 
