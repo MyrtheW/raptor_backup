@@ -1,6 +1,6 @@
 #include <raptor/search/search_single.hpp>
 #include <raptor/update/load_hibf.hpp>
-#include <raptor/update/insertions.hpp>
+
 #include <raptor/build/store_index.hpp>
 
 //
@@ -8,11 +8,8 @@
 
 namespace raptor
 {
-template <bool compressed>
-void load_hibf(update_arguments const & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
-{
-    using index_structure_t = std::conditional_t<compressed, index_structure::hibf_compressed, index_structure::hibf>;
-    auto index = raptor_index<index_structure_t>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
+void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments const & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
+{   if (not arguments.compressed){
     double index_io_time{0.0};
     load_index(index, arguments, index_io_time); // add: arguments.parts - 1, if HIBF consists of multiple
     // prepare index to allow for updates
@@ -37,33 +34,15 @@ void load_hibf(update_arguments const & arguments) // perhaps better to have ind
     // create datastructure for perfect ns.
 
     // make sure that the necessary data structures are loaded/created.
-
-    if constexpr (not compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
-        if (arguments.insert_ubs==true){
-            insert_ubs(arguments, index); // currently requires uncompressed type?  requires (compressed == false)
-        }else if(arguments.insert_sequences==true){
-            insert_sequences(arguments, index);
-        }else if(arguments.delete_ubs==true){
-            delete_ubs(arguments, index);
-        }else if(arguments.delete_sequences==true){
-
-        }else{
-            std::cout << "please select one of the options {delete-ubs, insert-ubs, insert-sequences, delete-sequences}";
-        }
-    }
-    else{ // todo try uncompressing a IBF
+    }else{ // todo try decompressing a IBF
         auto some_compressed_ibf = index.ibf().ibf_vector[0];
         seqan3::interleaved_bloom_filter<seqan3::data_layout::compressed> ibf_uncompressed{some_compressed_ibf};
     }
-
-    // if arguments.compressed, it should be compressed again
-    store_index(arguments.in_file, index, arguments);
-    //store_index(arguments.in_file, std::move(index), arguments); // store index
-    //todo: there is a bug in storing the index. Ask Svenja.
+    return;
 }
-
-template void load_hibf<false>(update_arguments const & arguments);
-template void load_hibf<true>(update_arguments const & arguments);
+//
+//template void load_hibf<false>(raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
+//template void load_hibf<true>(raptor_index<index_structure::hibf_compressed> & index, update_arguments const & arguments);
 
 }
 

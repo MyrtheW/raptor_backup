@@ -8,9 +8,10 @@
 #pragma once
 
 #include "raptor/argument_parsing/update_arguments.hpp"
+#include <raptor/index.hpp>
+
 
 namespace raptor
 {
-template <bool compressed>
-void load_hibf(update_arguments const & arguments);
+void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 } // namespace raptor

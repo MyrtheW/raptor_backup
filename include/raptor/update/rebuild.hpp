@@ -7,9 +7,16 @@
 
 #pragma once
 
-#include "raptor/argument_parsing/upgrade_arguments.hpp"
+#include <raptor/argument_parsing/update_arguments.hpp>
+#include <raptor/index.hpp>
 
 namespace raptor
 {
-void split_IBF(upgrade_arguments const & arguments);
+//void split_ibf(size_t ibf_idx,
+//                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
+//void recall_dp(size_t ibf_idx,
+//                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
+void recall_layout_2(size_t ibf_idx,
+                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
+
 } // namespace raptor
