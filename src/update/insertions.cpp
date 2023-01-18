@@ -258,16 +258,7 @@ size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t
         return(std::get<0>(index.ibf().previous_ibf_id[ibf_idx])); //ibf idx of merged bin a level up. If it is a root, it will automatically return the root index = 0
     }
 }
-//template <std::ranges::forward_range value_range_t>
-//    void bulk_contains_impl(value_range_t && values, int64_t const ibf_idx, size_t const threshold)
-//    {
-//        auto agent = hibf_ptr->ibf_vector[ibf_idx].template counting_agent<uint16_t>();
-//        auto & result = agent.bulk_count(values);
-//
-//
-//        for (size_t bin{}; bin < result.size(); ++bin)
-//        {
-//            sum += result[bin];
+
 
 
 

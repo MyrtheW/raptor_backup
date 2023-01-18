@@ -7,3 +7,5 @@ add_library ("raptor_update" STATIC
         rebuild.cpp
         )
 target_link_libraries ("raptor_update" PUBLIC "raptor_interface")
+
+target_link_libraries ("raptor_update" PUBLIC "raptor_interface" "chopper_layout_lib" xxHash::xxhash)

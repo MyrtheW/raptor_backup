@@ -21,6 +21,8 @@ void raptor_update(update_arguments const & arguments)
         auto index = raptor_index<index_structure::hibf>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
         load_hibf(index, arguments);
 
+        recall_layout_2(0, index, arguments);
+
         if //constexpr
         (not arguments.compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
             if (arguments.insert_ubs==true){
@@ -36,7 +38,6 @@ void raptor_update(update_arguments const & arguments)
             }
 
         }
-    recall_layout_2(0, index, arguments);
     // if arguments.compressed, it should be compressed again
     store_index(arguments.in_file, index, arguments);
     //store_index(arguments.in_file, std::move(index), arguments); // store index

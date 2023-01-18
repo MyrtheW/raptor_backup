@@ -154,6 +154,14 @@ public:
         return typename hierarchical_interleaved_bloom_filter<data_layout_mode>::membership_agent{*this};
     }
 
+    size_t ibf_count(){
+        assert(ibf_vector.size() == next_ibf_id.size()); // temporary
+        assert(ibf_vector.size() == occupancy_table.size()); // temporary
+        assert(ibf_vector.size() == previous_ibf_id.size()); // temporary
+        assert(ibf_vector.size() == fpr_table.size()); // temporary
+        assert(ibf_vector.size() == ibf_sizes.size()); // temporary
+        return ibf_vector.size();
+    }
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
         // Alternative to current implementation: use next_ibf_id.
         // assume we look up a bin `b` in IBF `i`, i.e. `next_ibf_id[i][b]`. If `i` is returned, there is no lower level IBF, bin `b` is hence not a merged bin.
@@ -196,14 +204,30 @@ public:
         //filenames_ibf = user_bins[ibf_idx];
         for (size_t bin_idx=0; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){
             //filename = filenames_ibf[bin_idx];
-            if (is_merged_bin(ibf_idx, bin_idx)){
+            if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
                 std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx][bin_idx]); // add this set to filenames
                 std::merge(filenames.begin(), filenames.end(), filenames_mb.begin(), filenames_mb.end(), std::inserter(filenames, filenames.begin()));
-            }else{ // recursively for merged bins.
-                filenames.insert(user_bins[(ibf_idx, bin_idx)]);
+            }else{ // user_bins[a,b]For a pair `(a,b)`, returns a const reference to the filename of the user bin at IBF `a`, bin `b`.
+                std::string y = user_bins[ibf_idx][bin_idx];
+//                std::string z = user_bins.filename_of_user_bin(user_bins.filename_index(ibf_idx, bin_idx));
+//                std::string x= user_bins[(ibf_idx, bin_idx)];
+                filenames.insert(user_bins[ibf_idx][bin_idx]); // check if filenames is updated, or filenames2 = filenames.insert
             }
         }
-        return filenames;
+        return filenames; // set of strings with filenames
+    }
+
+    std::unordered_set<size_t> ibf_indices_childeren(size_t ibf_idx){ // child_indices does not include ibf_idx.
+        // find the ibf indices of all leaves of a certain merged bin.
+        std::unordered_set<size_t> child_indices{};
+        for (size_t bin_idx=0; bin_idx < next_ibf_id[ibf_idx].size(); ++bin_idx){
+            if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
+                auto ibf_idx_mb = next_ibf_id[ibf_idx][bin_idx];
+                child_indices.insert(ibf_idx);
+                std::set<std::string> filenames_mb = filenames_children(ibf_idx_mb, child_indices); // add this set to filenames
+            }
+        }
+        return child_indices;
     }
 
     void initialize_previous_ibf_id()
