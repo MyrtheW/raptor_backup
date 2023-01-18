@@ -76,97 +76,107 @@ namespace raptor
 //
 //// METHOD 2
 //
-void recall_layout_2(size_t ibf_idx,
-                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments)
-{    // first do it without updating hyper loglog (sketch_directory, chopper_sketch_sketches) Perhaps use config from layout file. --> shows the count_filename and sketch_directory.
 
+/*!\brief Does a partial rebuild for the subtree at index ibf_idx
+ * \details The algorithm rebuilds a subtree of the hierarchical interleaved bloom filter completely.
+ * (1) It computes the set of filenames belonging to all user bins in the subtree, and stores those in a text file
+ * (2) It computes a good layout by calling Choppers's layout algorithm.
+ * (3) It rebuilds the subtree by calling hierachical build function.
+ * (4) It merges the index of the HIBF of the newly obtained subtree with the original index.
+ * \param[in] ibf_idx the location of the subtree in the HIBF
+ * \param[in] index the original HIBF
+ * \param[in] update_arguments the arguments that were passed with the update that was to be done on the HIBF.
+ * \author Myrthe
+ */
+void partial_rebuild(size_t ibf_idx,
+                  raptor_index<index_structure::hibf> & index, update_arguments const & update_arguments)
+{
     //1) obtain filenames from all lower bins and kmer counts. Perhaps using occupancy table.
     auto filenames_subtree = index.ibf().filenames_children(ibf_idx);
-    //seqan3::test::tmp_filename subtree_bin_paths_filename{"subtree_bin_paths.txt"};
+    //1.2) Store filenames as text file.
     std::string subtree_bin_paths_filename{"subtree_bin_paths.txt"};
-    write_filenames(subtree_bin_paths_filename, filenames_subtree);  //--> writes them for all.  write to a tmp_subtree_bin_paths.
-
-    // 1.2) and store filenames as text file., with count_filename = "chopper_sketch.count"
-        //get_kmer_counts(index, arguments);
-    //3) call Chopper layout on output,
-    //see test file in chopper, which call execute.
-    chopper::configuration layout_arguments = layout_config(subtree_bin_paths_filename, arguments);
-    recall_layout_1(ibf_idx, index,  layout_arguments);
-
-    //4) hierarchical build.
-    raptor_index<index_structure::hibf> subindex{};
-
-    build_arguments build_arguments = build_config(subtree_bin_paths_filename, arguments);
-    recall_build_1(build_arguments, subindex); //todo continue here
+    write_filenames(subtree_bin_paths_filename, filenames_subtree);
+    chopper::configuration layout_arguments = layout_config(subtree_bin_paths_filename, update_arguments); // create the arguments to run the layout algorithm with.
+    //1.3) Possibly obtain the kmer count and store together with the filenames as text file.
+    get_kmer_counts(index, filenames_subtree, layout_arguments.count_filename); // this works
+    //2) call chopper layout on the stored filenames.
+    //call_layout(ibf_idx, index, layout_arguments);
+    //3) call hierarchical build.
+    raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
+    build_arguments build_arguments = build_config(subtree_bin_paths_filename, update_arguments); // create the arguments to run the build algorithm with.
+    call_build(build_arguments, subindex);    //todo test if this works
+    //4) merge the index of the HIBF of the newly obtained subtree with the original index.
     merge_indexes(index, subindex, ibf_idx);
 
 }
 
-// store kmer/minimizer counts for each filename
+/*!\brief Store kmer or minimizer counts for each specified file stored within the HIBF.
+ * \details The algorithm obtains the total kmer count for each file and stores those counts together with the
+ * filenames to a text file.
+ * \param[in] filenames a set of filenames of which the counts should be stored.
+ * \param[in] index the original HIBF
+ * \param[in] count_filename the filename to which the counts should be stored.
+ * \author Myrthe
+ */
+void get_kmer_counts(raptor_index<index_structure::hibf> & index, std::set<std::string> filenames, std::filesystem::path count_filename){
+    // alternatively, create/extract counts for these filenames by calling Chopper count
+    std::ofstream out_stream(count_filename.c_str()); // or std::filesystem::u8path(subtree_bin_paths);
 
-//void get_kmer_counts(raptor_index<index_structure::hibf> & index, update_arguments const & arguments, filenames, count_filename){
-//    // alternatively, create/extract counts for these filenames by calling Chopper count
-//    // clear the count file first, with count_filename = "chopper_sketch.count"
-//
-//    for (auto & filename :filenames){        //for (auto & filename : index.ibf().user_bins){// for each file in index.user_bins, perhaps I have to use .user_bin_filenames, but this is private... or index.filenames
-//        if (std::filesystem::path(filename).extension() !=".empty_bin"){ //no matching function for call to
-//                index.ibf().get_occupancy_file(filename);
-//                write_count_file_line(cluster_vector[i], weight, fout); // function in chopper, to store filenames to the text file.
-//        }
-//
-//    }
-//}
+    for (std::string const & filename : filenames){        //for (auto & filename : index.ibf().user_bins){// for each file in index.user_bins, perhaps I have to use .user_bin_filenames, but this is private... or index.filenames
+        if (std::filesystem::path(filename).extension() !=".empty_bin"){ //no matching function for call to
+                int kmer_count = index.ibf().get_occupancy_file(const_cast<std::string &>(filename));
+                out_stream << filename + ' ' + std::to_string(kmer_count) + '\n';
+        }
+    }
+}
 
-
-void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames)
-//std::filesystem::path bin_path
-    {
+/*!\brief Writes each of the specified files to a text file
+ * \param[in] filenames a set of filenames of which the counts should be stored.
+ * \param[in] user_bin_filenames the filename to which the counts should be stored.
+ * \author Myrthe
+ */
+void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames){
     std::ofstream out_stream(bin_path.c_str());
-    size_t position{};
-        std::string line{};
-        for (auto const & filename : user_bin_filenames)
+    for (auto const & filename : user_bin_filenames)
         { if (std::filesystem::path(filename).extension() !=".empty_bin"){
-                line.clear();
-    //            line = '#';
-    //            line += std::to_string(position);
-    //            line += '\t';
-                line += filename;
-                line += '\n';
-                out_stream << line;
-                ++position;
+                out_stream << filename + '\n';
             }
         }
     }
 
-chopper::configuration  layout_config(std::string subtree_bin_paths, update_arguments const & arguments){
+    /*!\brief Creates a configuration object which is passed to chopper's layout algorithm.
+ * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
+ * \author Myrthe
+ */
+chopper::configuration layout_config(std::string subtree_bin_paths, update_arguments const & arguments){
     seqan3::test::tmp_filename const input_prefix{"test"};
-    seqan3::test::tmp_filename const layout_file{"layout.tsv"};
-    seqan3::test::tmp_filename data_filename{"all_bin_paths"};
-    //std::filesystem::path(filename)
+    seqan3::test::tmp_filename const layout_file{"layout.tsv"}; //std::filesystem::path(filename)
+
     chopper::configuration config{};     // raptor layout --num-hash-functions 2 --false-positive-rate 0.05 --input-file all_bin_paths.txt --output-filename hibf_12_12_ebs.layout --rearrange-user-bins --kmer-size 20 --tmax 64 --update-UBs 0.10
     // files: input of bins paths or count file. For now bin_paths.
     config.input_prefix = input_prefix.get_path();
-    config.output_prefix = config.input_prefix;
+    config.output_prefix = config.input_prefix; //todo Could not open file /tmp/seqan_test_XXXFZoTz/test.count for writing.
     config.output_filename = layout_file.get_path();
 
     //const std::filesystem::path subtree_bin_paths = std::filesystem::u8path(subtree_bin_paths);
-    config.data_file =  std::filesystem::u8path(subtree_bin_paths); //std::filesystem::cx_11path arguments.bin_file; //data_filename.get_path();
-    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory);
+    config.data_file =  std::filesystem::u8path(subtree_bin_paths); // or should this be without txt? //std::filesystem::cx_11path arguments.bin_file; //data_filename.get_path();
+    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory);//here the count filename is created.
 
-    config.rearrange_user_bins = false; //arguments.similarity
+    config.rearrange_user_bins = false; //arguments.similarity ==> should indicate whether updates should account for user bin's similarities.
     config.update_ubs = 0.1; //arguments.empty_bin_percentage percentage of empty bins drawn from distributions //makes sure to use empty bins.
 
     config.tmax = 64; // index.tmax --> store tmax and fpr_max as a parameters of the index.
     config.false_positive_rate = 0.05;  //index.false_positive_rate
+
     return config;
 }
-    //////////////
-    void recall_layout_1(size_t ibf_idx, // perhaps parse an argument with a filename/base, before calling the layout, store the descendent childeren of the layout.
+
+    void call_layout(size_t ibf_idx, // perhaps parse an argument with a filename/base, before calling the layout, store the descendent childeren of the layout.
                   raptor_index<index_structure::hibf> & index, chopper::configuration & config){
     int exit_code{};
     try
-    {
-        exit_code |= chopper::count::execute(config); // make sure this file is already stored.
+    {  // todo solve error with writing to test.count file in chopper::count. same happens with chopper::execute.
+        //exit_code |= chopper::count::execute(config); // make sure this file is already stored, when similarity does not need to be taken into account.
         if (config.rearrange_user_bins){ // if similarity must be taken into account, then use count to calculate sketches.
             exit_code |= chopper::count::execute(config);
         }
@@ -177,16 +187,17 @@ chopper::configuration  layout_config(std::string subtree_bin_paths, update_argu
     }
 }
 
-build_arguments build_config(std::string subtree_bin_paths, update_arguments const & arguments){
+    /*!\brief Creates a configuration object which is passed to hierarchical build function.
+ * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
+ * \author Myrthe
+ */
+build_arguments build_config(std::string subtree_bin_paths, update_arguments const & update_arguments){
     seqan3::test::tmp_filename const input_prefix{"test"};
     seqan3::test::tmp_filename const layout_file{"layout.tsv"};
-    seqan3::test::tmp_filename data_filename{"all_bin_paths"};
     build_arguments build_arguments{};
 
-    //std::filesystem::path(filename)
     build_arguments.kmer_size = 20;
     build_arguments.window_size = 23;
-    //arguments.size = ;
     build_arguments.fpr = 0.05; //index.false_positive_rate
     build_arguments.is_hibf = true;
     build_arguments.bin_file = "layout.tsv";//layout_file; // should contain the layout file.
@@ -213,41 +224,20 @@ build_arguments build_config(std::string subtree_bin_paths, update_arguments con
 
 
 template <seqan3::data_layout data_layout_mode>
-void recall_build_1(build_arguments & arguments
-                    , raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> index
-                    ){
-
-
+void call_build(build_arguments & arguments, raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index){
     hibf::build_data<data_layout_mode> data{};
-
     raptor::hibf::create_ibfs_from_chopper_pack(data, arguments);
-
     std::vector<std::vector<std::string>> bin_path{};
     for (size_t i{0}; i < data.hibf.user_bins.num_user_bins(); ++i)
         bin_path.push_back(std::vector<std::string>{data.hibf.user_bins.filename_of_user_bin(i)});
-
-    index.ibf() = std::move(data.hibf);
-//    raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> index{window{arguments.window_size},
-//                                                                                arguments.shape,
-//                                                                                arguments.parts,
-//                                                                                arguments.compressed,
-//                                                                                bin_path,
-//                                                                                std::move(data.hibf)};
-    // todo: return index, or make sure index can be provided as input.
-
+    index.ibf() = std::move(data.hibf); //instead of creating the index object here.
 }
-template void recall_build_1 <seqan3::data_layout::uncompressed> (build_arguments & arguments , raptor_index<hierarchical_interleaved_bloom_filter<seqan3::data_layout::uncompressed>> index);
-//
+
 template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_remove, std::vector<T> & vector) {
         for (int i : indices_to_remove) {
             vector.erase(vector.begin() + i);
         }
     }
-template <typename T> void replace_indices(std::vector<int> indices_map, std::vector<T> & vector) {
-            for (int i{0}; i < vector.size(); ++i) vector[i] = (T) indices_map[i];
-    }
-
-
 
 void merge_indexes(raptor_index<index_structure::hibf> & index, raptor_index<index_structure::hibf> & subindex, size_t ibf_idx){
     // without splitting:

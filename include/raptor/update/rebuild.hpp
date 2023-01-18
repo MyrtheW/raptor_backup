@@ -18,16 +18,16 @@ namespace raptor
 //void split_ibf(size_t ibf_idx,
 //                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 chopper::configuration  layout_config(std::string subtree_bin_paths, update_arguments const & arguments);
-void recall_layout_1(size_t ibf_idx,
+void call_layout(size_t ibf_idx,
                   raptor_index<index_structure::hibf> & index, chopper::configuration & arguments);
-
-void recall_layout_2(size_t ibf_idx,
+void get_kmer_counts(raptor_index<index_structure::hibf> & index, std::set<std::string> filenames, std::filesystem::path count_filename);
+void partial_rebuild(size_t ibf_idx,
                   raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames);
-build_arguments build_config(std::string subtree_bin_paths, update_arguments const & arguments);
+build_arguments build_config(std::string subtree_bin_paths, update_arguments const & update_arguments);
 template <seqan3::data_layout data_layout_mode>
-void recall_build_1(build_arguments & arguments);
-template <typename T> void remove_indices(std::vector<T> & arg) ;
+void call_build(build_arguments & arguments, raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index);
+template <typename T> void remove_indices(std::vector<T> & arg);
 void merge_indexes(raptor_index<index_structure::hibf> & index, raptor_index<index_structure::hibf> & subindex, size_t ibf_idx);
 
 } // namespace raptor

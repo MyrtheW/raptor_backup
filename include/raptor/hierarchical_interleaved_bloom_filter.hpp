@@ -177,7 +177,7 @@ public:
         // check if it also works for merged bins.
         size_t number_of_bins = 1;
         if (not is_merged_bin(ibf_idx, bin_idx)){// for now assume that only leaf bins can be split.
-            std::string filename = user_bins[(ibf_idx, bin_idx)];// user_bins.filename_of_user_bin(user_bins.filename_index(ibf_idx, bin_idx)); // or user_bin_filenames[(ibf_idx, bin_idx)];
+            std::string filename = user_bins[(ibf_idx, bin_idx)];// todo change to user_bins[][] user_bins.filename_of_user_bin(user_bins.filename_index(ibf_idx, bin_idx)); // or user_bin_filenames[(ibf_idx, bin_idx)];
             //alternatively use user_bins[ibf_idx] --> Returns a view over the user bin filenames for the `ibf_idx`th IBF. An empty string is returned for merged bins.
             if (filename != ""){number_of_bins = std::get<2>(user_bins.find_filename(filename));}
         }
@@ -207,24 +207,23 @@ public:
             if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
                 std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx][bin_idx]); // add this set to filenames
                 std::merge(filenames.begin(), filenames.end(), filenames_mb.begin(), filenames_mb.end(), std::inserter(filenames, filenames.begin()));
-            }else{ // user_bins[a,b]For a pair `(a,b)`, returns a const reference to the filename of the user bin at IBF `a`, bin `b`.
-                std::string y = user_bins[ibf_idx][bin_idx];
-//                std::string z = user_bins.filename_of_user_bin(user_bins.filename_index(ibf_idx, bin_idx));
-//                std::string x= user_bins[(ibf_idx, bin_idx)];
-                filenames.insert(user_bins[ibf_idx][bin_idx]); // check if filenames is updated, or filenames2 = filenames.insert
+            }else{
+                std::string y = user_bins[ibf_idx][bin_idx]; // delete this.
+                filenames.insert(user_bins[ibf_idx][bin_idx]); //todo, at some point, it inserts and empty string "", Idk if this is during merging or inserting, but there is no empty string in user_bins.filenames.
             }
         }
         return filenames; // set of strings with filenames
     }
 
-    std::unordered_set<size_t> ibf_indices_childeren(size_t ibf_idx){ // child_indices does not include ibf_idx.
+    std::unordered_set<size_t> ibf_indices_childeren(size_t ibf_idx, std::unordered_set<size_t> child_indices = {}){ // child_indices does not include ibf_idx.
         // find the ibf indices of all leaves of a certain merged bin.
-        std::unordered_set<size_t> child_indices{};
+        //std::unordered_set<size_t> child_indices{};
         for (size_t bin_idx=0; bin_idx < next_ibf_id[ibf_idx].size(); ++bin_idx){
             if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
                 auto ibf_idx_mb = next_ibf_id[ibf_idx][bin_idx];
                 child_indices.insert(ibf_idx);
-                std::set<std::string> filenames_mb = filenames_children(ibf_idx_mb, child_indices); // add this set to filenames
+//                std::set<std::string> filenames_mb =
+                        ibf_indices_childeren(ibf_idx_mb, child_indices); // add this set to filenames
             }
         }
         return child_indices;
