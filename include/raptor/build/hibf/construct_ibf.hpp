@@ -32,7 +32,8 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
                                                  build_data<data_layout_mode> & data,
                                                  build_arguments const & arguments,
                                                  bool is_root,
-                                                 size_t lower_ibf_idx);
+                                                 size_t lower_ibf_idx,
+                                                 size_t & empty_bin_kmers);
 
 
 } // namespace raptor::hibf

@@ -21,7 +21,8 @@ void raptor_update(update_arguments const & arguments)
         auto index = raptor_index<index_structure::hibf>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
         load_hibf(index, arguments);
 
-        partial_rebuild(0, index, arguments);
+        std::tuple<size_t,size_t> index_tuple = std::make_tuple(1, 0);
+        partial_rebuild(index_tuple, index, arguments);
 
         if //constexpr
         (not arguments.compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed

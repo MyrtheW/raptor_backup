@@ -21,6 +21,7 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
                                 std::vector<int64_t> & filename_indices,
                                 lemon::ListDigraph::Node const & node,
                                 build_data<data_layout_mode> & data,
-                                build_arguments const & arguments);
+                                build_arguments const & arguments,
+                                size_t & );
 
 } // namespace raptor::hibf

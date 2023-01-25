@@ -50,5 +50,6 @@ using index_structure_t = std::conditional_t<seqan3::uncompressed, index_structu
 
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
-                    raptor_index<index_structure_t> & index);  //Myrthe 20.10
+                    raptor_index<index_structure_t> & index,
+                     std::tuple <uint64_t, uint64_t> rebuild_index_tuple);  //Myrthe 20.10
 } // namespace raptor

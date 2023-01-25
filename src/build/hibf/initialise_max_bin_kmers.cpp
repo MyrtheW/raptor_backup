@@ -21,7 +21,8 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
                                 std::vector<int64_t> & filename_indices,
                                 lemon::ListDigraph::Node const & node,
                                 build_data<data_layout_mode> & data,
-                                build_arguments const & arguments) //,n_empty_bins
+                                build_arguments const & arguments,
+                                size_t & empty_bin_kmers) //,n_empty_bins
 {
     auto & node_data = data.node_map[node];
 
@@ -29,7 +30,7 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
     {
         // recursively initialize favourite child first
         ibf_positions[node_data.max_bin_index] =
-            hierarchical_build(kmers, node_data.favourite_child, data, arguments, false); // add argument; (parent_)n_empty_bins input ?
+            hierarchical_build(kmers, node_data.favourite_child, data, arguments, false,empty_bin_kmers); // add argument; (parent_)n_empty_bins input ?
         return 1;
     }
     else // max bin is not a merged bin
@@ -39,7 +40,8 @@ size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
         if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // if it is an empty bin, no kmers will be computed, and the kmer-estimate of the empty bin will be used
             compute_kmers(kmers, arguments, record);
             update_user_bins(data, filename_indices, record);
-        }
+        } // initializing an IBF -> empty bin kmers are already added within construct_ibf
+
         return record.number_of_bins.back();
     }
 }
@@ -50,13 +52,15 @@ initialise_max_bin_kmers<seqan3::data_layout::uncompressed>(robin_hood::unordere
                                                             std::vector<int64_t> &,
                                                             lemon::ListDigraph::Node const &,
                                                             build_data<seqan3::data_layout::uncompressed> &,
-                                                            build_arguments const &);
+                                                            build_arguments const &,
+                                                            size_t &);
 
 template size_t initialise_max_bin_kmers<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                           std::vector<int64_t> &,
                                                                           std::vector<int64_t> &,
                                                                           lemon::ListDigraph::Node const &,
                                                                           build_data<seqan3::data_layout::compressed> &,
-                                                                          build_arguments const &);
+                                                                          build_arguments const &,
+                                                                          size_t &);
 
 } // namespace raptor::hibf

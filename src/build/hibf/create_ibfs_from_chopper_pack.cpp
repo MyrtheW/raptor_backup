@@ -24,7 +24,8 @@ void create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_ar
     size_t const t_max{data.node_map[root].number_of_technical_bins}; //todo Ask Svenja about nodemap
     data.compute_fp_correction(t_max, arguments.hash, arguments.fpr);
 
-    hierarchical_build(root_kmers, root, data, arguments, true);
+    size_t empty_bin_kmers=0;
+    hierarchical_build(root_kmers, root, data, arguments, true, empty_bin_kmers);
 }
 
 template void

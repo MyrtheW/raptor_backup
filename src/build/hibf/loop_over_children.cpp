@@ -23,7 +23,8 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                         lemon::ListDigraph::Node const & current_node,
                         build_data<data_layout_mode> & data,
                         build_arguments const & arguments,
-                        bool is_root)
+                        bool is_root,
+                        size_t & empty_bin_kmers)
 {
     auto & current_node_data = data.node_map[current_node];
     std::vector<lemon::ListDigraph::Node> children{};
@@ -44,7 +45,7 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
         if (child != current_node_data.favourite_child)
         {
             robin_hood::unordered_flat_set<size_t> kmers{};
-            size_t const ibf_pos = hierarchical_build(kmers, child, data, arguments, false);
+            size_t const ibf_pos = hierarchical_build(kmers, child, data, arguments, false, empty_bin_kmers);
             auto parent_bin_index = data.node_map[child].parent_bin_index;
             {
                 size_t const mutex_id{parent_bin_index / 64};
@@ -80,7 +81,8 @@ template void loop_over_children<seqan3::data_layout::uncompressed>(robin_hood::
                                                                     lemon::ListDigraph::Node const &,
                                                                     build_data<seqan3::data_layout::uncompressed> &,
                                                                     build_arguments const &,
-                                                                    bool);
+                                                                    bool,
+                                                                    size_t &);
 
 template void loop_over_children<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                   seqan3::interleaved_bloom_filter<> &,
@@ -88,6 +90,7 @@ template void loop_over_children<seqan3::data_layout::compressed>(robin_hood::un
                                                                   lemon::ListDigraph::Node const &,
                                                                   build_data<seqan3::data_layout::compressed> &,
                                                                   build_arguments const &,
-                                                                  bool);
+                                                                  bool,
+                                                                  size_t &);
 
 } // namespace raptor::hibf

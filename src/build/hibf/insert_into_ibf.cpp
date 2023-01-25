@@ -135,13 +135,24 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 
 namespace raptor{
 
-     //Myrthe
-// write comments. this version is only used for updating.
+
+
+/*!\brief This version of insert_into_ibf is only used for updating.
+ * \param[in] kmers The kmers to be inserted.
+ * \param[in] index_triple consisting of the ibf_idx, start_bin_idx and number_of_bins.
+ * \param[in] index The HIBF.
+ * \param[in] rebuild_index_tuple A tuple of the index of IBF and TB that need to be rebuild.
+ * If the current TB reaches the FPR_max, it will be equal to the input value (when using the layout-rebuild method)
+ * \attention This function is only available for **uncompressed** Interleaved Bloom Filters.
+ * \author Myrthe Willemsen
+ */
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
-                    raptor_index<index_structure::hibf> & index) // only if IBF is uncompressed.
+                    raptor_index<index_structure::hibf> & index,
+                    std::tuple <uint64_t, uint64_t> rebuild_index_tuple) // change to std::set rebuild_indexes if using the splitting method.
+                    // only if IBF is uncompressed.
 { // change this, so that if you have multiple technical bins of different sizes, you can create the chunks in accordance to these sizes.
-
+    int union_count = 0; //You should somehow check if the bits set to 1 were already set to 1.
     size_t const ibf_idx = std::get<0>(index_triple);
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);
@@ -149,7 +160,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 
-    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
+    for (auto chunk : kmers | seqan3::views::chunk(chunk_size)) //QUESTION: Why cut it into chunks?
     {
         assert(chunk_number < number_of_bins);
         seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};
@@ -157,22 +168,17 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
         for (size_t const value : chunk)
         {
             auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
-            ibf.emplace(value, bin_index);
+            union_count += ibf.emplace_exists(value, bin_index); // Union count value will remain 0 if inserted in an empty bin.
         }
     }
 
     // to improve the implementation, Perhaps do the FPR calculations for all bins to which kmers will be inserted before actually inserting.
-    index.ibf().update_occupancy_table(kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
+    index.ibf().update_occupancy_table(kmers.size()-union_count, ibf_idx, start_bin_idx, number_of_bins);
     auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
-
-
-
-    // todo:
-    // 1)  assert that fpr < fpr max, if UB was inserted in a LB, leaf TB.
-    // 2)        if (fpr  > threshold){
-    //        Rebuild! (when splitting-rebuilding, passing on parent k-mers). for relayout, only do it afterwards
-    //        }
-
+    if (fpr > index.ibf().fpr_max){
+        assert(index.ibf().next_ibf_id[ibf_idx][start_bin_idx] != ibf_idx); //assert that fpr should not reach fpr max for the leaf bin ibf, because we search a location such that it is 'feasible', i.e. binsize should be sufficient to accomodate new UB.
+        rebuild_index_tuple = std::make_tuple(ibf_idx, start_bin_idx);
+    }
 }
 
-}
+} // namespace raptor
