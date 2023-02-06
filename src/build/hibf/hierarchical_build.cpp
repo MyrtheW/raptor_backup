@@ -18,14 +18,23 @@
 namespace raptor::hibf
 {
 
+/*!\brief Recursively builds the HIBF from the precomputed layout.
+* \details Recursive function to build the Hierarchical Interleaved Bloom Filter from the layout produced by chopper,
+ * read into the `node_map`.
+ * This version supports the Dynamic HIBF, by taking into account empty bins
+ * and by updating the supporting tables (e.g. the FPR and occupancy table).
+* \param[in] empty_bin_kmers The variable is recursively passed on, such that merged bins are allocated suffiencient
+ * space to accomodate all empty bins in its subtree.
+* \param[out] data The data object sores the HIBF and supporting tables.
+* \author Adapted by Myrthe Willemsen
+*/
 template <seqan3::data_layout data_layout_mode>
 size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                           lemon::ListDigraph::Node const & current_node,
                           build_data<data_layout_mode> & data,
                           build_arguments const & arguments,
                           bool is_root,
-                          size_t & empty_bin_kmers
-                          ) // add argument; empty_bin_kmers input
+                          size_t & empty_bin_kmers)
 {
     auto & current_node_data = data.node_map[current_node];
 
@@ -35,44 +44,18 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     std::vector<int64_t> filename_indices(current_node_data.number_of_technical_bins, -1);
     robin_hood::unordered_flat_set<size_t> kmers{};
 
-
-            //myrthe: loop here
-                    // Instead I could use the estimated file sizes, i.e.:  size_t const kmers_per_bin{record.estimated_sizes[0]};
-                // this would be an option, but then I would need  to adapt parse_chopper_pack_line and saving the layout, because this information is currently not stored. Perhaps I could also store it in the filename.
-                // now there could exist a case where all BFs in the IBF are empty.
-            //for (; current_node_data.max_bin_index < ibf_positions.size(); current_node_data.max_bin_index++){
-                // or perhaps set node.max_bin_index +=1, but I might be mininterpreting it: is max_bin_index the index of the maximum sized bin in the IBF, or is it the index of the IBF in the HIBF, which seems from "ibf_positions[node_data.max_bin_index]", but std::vector<int64_t> ibf_positions(current_node_data.number_of_technical_bins, ibf_pos);
-                // it could be that remaining records and bin_indices are not synchonized.
-            //        if ( //current_node_data.remaining_records[current_node_data.max_bin_index].filenames[0] != "empty_bin" //current_node.record.filenames[current_node_data.max_bin_index] != "empty_bin"
-            //        (std::filesystem::path(current_node_data.remaining_records[current_node_data.max_bin_index].filenames[0]).extension() !=".empty_bin")
-            //                ){ // also add a case for if all BFs are empty bins?
-
     // initialize lower level IBF
     size_t const max_bin_tbs =
-    initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments, empty_bin_kmers); // or add max_bin_index
+    initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments, empty_bin_kmers);
     auto lower_ibf_idx = ibf_positions[data.node_map[current_node].max_bin_index];
-    auto && ibf = construct_ibf(parent_kmers, kmers, max_bin_tbs, current_node, data, arguments, is_root, lower_ibf_idx, empty_bin_kmers); // add is_leaf parameter to define if it
+    auto && ibf = construct_ibf(kmers, max_bin_tbs, current_node, data, arguments, empty_bin_kmers);
     data.hibf.occupancy_table[ibf_pos].resize(ibf.bin_count());
-    data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count());
-    data.hibf.ibf_vector[ibf_pos] = ibf; // I included this here, as it is needed for updating the fpr table during insert_into_ibf. Does this make ata.hibf.ibf_vector[ibf_pos] = std::move(ibf) redundant? Does the ibf in ibf_vector change if the ibf itself changes?
-    insert_into_ibf(parent_kmers, kmers, max_bin_tbs, data.node_map[current_node].max_bin_index, ibf, is_root);
+    data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count()); // Update the FPR and occupancy table for the dynamic HIBF.
+    data.hibf.ibf_vector[ibf_pos] = ibf;// This is required for updating the fpr table during insert_into_ibf.
+    insert_into_ibf(parent_kmers, kmers, max_bin_tbs, data.node_map[current_node].max_bin_index, ibf, is_root); // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
     kmers.clear(); // reduce memory peak
 
-            // We assume that max_bin_index corresponds to the first entry in remaining records. Can we also assume that the remaining records are further sorted on size, and based on in what ibf they should go?
-            // if yes
-            // you should increase max_bin_index by  //max_bin_index += .remaining_records[current_node_data.max_bin_index].
-            // if no: option 1 )if max bin index == empty bin, then loop over remaining records to find a non empty bin by:( can also be done in initilialize_max_bin..
-                // update max bin index
-                // remove first record
-//                for record_idx=0; record_idx < remaining_records.size(); record_idx
-            // but again this only works if remaining_records are sorted.
-
-            // option 2) save the approximate #kmers --> change layout and change construct_ibf
-           // option 3) move empty IBFs below the max_bin; i.e. make sure that the max_bin_id in chopper layout is not pointed to an empty bin . Probably not the easiest, because this comes out of the layout production...
-            // all of above options have the issue that you lose space if the empty bin(s) were supposed to be larger. To solve this, you should store hom much larger the value is then the next IBF.
-
-
-    // parse all other children (merged bins) of the current ibf
+    // Parse all other children (merged bins) of the current ibf
     loop_over_children(parent_kmers, ibf, ibf_positions, current_node, data, arguments, is_root, empty_bin_kmers);
 
     // If max bin was a merged bin, process all remaining records, otherwise the first one has already been processed
@@ -80,28 +63,20 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     for (size_t i = start; i < current_node_data.remaining_records.size(); ++i)
     {
         auto const & record = current_node_data.remaining_records[i];
-        if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // only the first entry of filenames stores something, hence the [0]
-//            if (is_root && record.number_of_bins.back() == 1) // no splitting needed
-//            {
-//                insert_into_ibf(arguments, record, ibf);
-//            }
-//            else
-//            {
-//                compute_kmers(kmers, arguments, record);
-//                insert_into_ibf(parent_kmers, kmers, record.number_of_bins.back(), record.bin_indices.back(), ibf, is_root);
-//            }
-                compute_kmers(kmers, arguments, record);
-                insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, (uint64_t) record.bin_indices.back(), (uint64_t) record.number_of_bins.back()), data.hibf, ibf, is_root);
+        if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // Only the first entry of `filenames` stores the actual filename, hence it has to be indexed with [0]
+            compute_kmers(kmers, arguments, record);
+            insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, (uint64_t) record.bin_indices.back(),
+                            (uint64_t) record.number_of_bins.back()), data.hibf, ibf, is_root);
             kmers.clear();
-        }else{ // For empty bins, this is the place where I add there k-mer buffer Only place with compute kmers.
-            std::string kmer_count = (std::string) std::filesystem::path(record.filenames[0]).stem();
+        }else{ // if we are dealing with an empty bin, their size will be extracted and and added to `empty_bin_kmers`, which is to be passed on to parent merged bins.
+            std::string kmer_count = (std::string) std::filesystem::path(record.filenames[0]).stem(); // The empty bin's intended size will be extracted from the filename
             double kmer_count_double = ::atof(kmer_count.c_str());
-            empty_bin_kmers += static_cast<size_t>(kmer_count_double);
+            empty_bin_kmers += static_cast<size_t>(kmer_count_double); // The empty bin's size is added to `empty_bin_kmers`, which is to be passed on to the parent merged bins of the empty bin.
         }
-        update_user_bins(data, filename_indices, record); //this would also not be needed for empty bins in my opinion.
+        update_user_bins(data, filename_indices, record);
     }
 
-    data.hibf.ibf_vector[ibf_pos] = std::move(ibf);
+    data.hibf.ibf_vector[ibf_pos] = std::move(ibf); // assign the ibf again to the ibf_vector to make sure that the updates are incorporated.
     data.hibf.next_ibf_id[ibf_pos] = std::move(ibf_positions);
     data.hibf.user_bins.bin_indices_of_ibf(ibf_pos) = std::move(filename_indices);
 

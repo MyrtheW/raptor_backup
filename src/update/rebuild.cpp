@@ -100,11 +100,11 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     //1.2) Store filenames as text file.
     std::string subtree_bin_paths_filename{"subtree_bin_paths.txt"};
     write_filenames(subtree_bin_paths_filename, filenames_subtree);
-    chopper::configuration layout_arguments = layout_config(subtree_bin_paths_filename, index, update_arguments); // create the arguments to run the layout algorithm with.
+    chopper::configuration layout_arguments = layout_config(index, update_arguments, subtree_bin_paths_filename); // create the arguments to run the layout algorithm with.
     //1.3) Possibly obtain the kmer count and store together with the filenames as text file.
     get_kmer_counts(index, filenames_subtree, layout_arguments.count_filename); // this works
     //2) call chopper layout on the stored filenames.
-    call_layout(index, layout_arguments);
+    call_layout(layout_arguments);
     //3) call hierarchical build.
     raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(subtree_bin_paths_filename, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
@@ -149,55 +149,62 @@ void write_filenames(std::string bin_path, std::set<std::string> user_bin_filena
     }
 
 /*!\brief Creates a configuration object which is passed to chopper's layout algorithm.
- * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
+ * \param[in] update_arguments the file containing all paths to the user bins for which a layout should be computed
+ * \param[in] index the original HIBF
+ * \param[in] bin_paths
  * \author Myrthe
  */
-chopper::configuration layout_config(std::string bin_paths, raptor_index<index_structure::hibf> & index, update_arguments const & arguments){
-    seqan3::test::tmp_filename const input_prefix{"test"};
-    seqan3::test::tmp_filename const layout_file{"layout.tsv"}; //std::filesystem::path(filename)
+chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
+                                     update_arguments const & update_arguments,
+                                     const std::string& bin_paths = ""
+                                     ){
+    seqan3::test::tmp_filename const input_prefix{"temporary_layouting_files"};
+    seqan3::test::tmp_filename const layout_file{"layout.tsv"};
 
     chopper::configuration config{};     // raptor layout --num-hash-functions 2 --false-positive-rate 0.05 --input-file all_bin_paths.txt --output-filename hibf_12_12_ebs.layout --rearrange-user-bins --kmer-size 20 --tmax 64 --update-UBs 0.10
     // files: input of bins paths or count file. For now bin_paths.
-    config.input_prefix = "test"; //input_prefix.get_path();
+    config.input_prefix = input_prefix.get_path();
     config.output_prefix = config.input_prefix;
-    config.output_filename = "layout2.tsv";//layout_file.get_path();
-    config.data_file = bin_paths;// std::filesystem::u8path(subtree_bin_paths); // or should this be without txt? //std::filesystem::cx_11path arguments.bin_file; //data_filename.get_path();
-    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory);//here the count filename is created.
+    config.output_filename = layout_file.get_path(); // TODO CHECK: if this works, otherwise return to "layout2.tsv"; "temporary_layouting_files" for input_prefix.
+    config.data_file = bin_paths;
+    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory); // here the count filename and output_prefix are set.
+    config.sketch_directory = update_arguments.sketch_directory;
+    config.rearrange_user_bins = update_arguments.similarity; // indicates whether updates should account for user bin's similarities.
+    config.update_ubs = update_arguments.empty_bin_percentage; // percentage of empty bins drawn from distributions //makes sure to use empty bins.
 
-    config.rearrange_user_bins = false; //arguments.similarity ==> should indicate whether updates should account for user bin's similarities.
-    config.update_ubs = 0.1; //arguments.empty_bin_percentage percentage of empty bins drawn from distributions //makes sure to use empty bins.
-
-    config.tmax = 64; // index.tmax --> store tmax and fpr_max as a parameters of the index.
+    config.tmax = index.ibf().t_max;
     config.false_positive_rate = index.ibf().fpr_max;
 
     return config;
 }
 
-    /*!\brief Creates a configuration object which is passed to hierarchical build function.
- * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
-     * \warning an extra enter/return in the file will cause segmentation faults in chopper.
- * \author Myrthe
- */
-    void call_layout(raptor_index<index_structure::hibf> & index, chopper::configuration & config){
 
+/*!\brief Calls the layout algorithm from the chopper library
+* \param[in] layout_arguments configuration object with parameters required for calling the layout algorithm
+* \warning an extra enter/return at the start of the bin file will cause segmentation faults in chopper.
+* \author Myrthe
+*/
+void call_layout(chopper::configuration & layout_arguments){
     int exit_code{};
     try
     {
-        exit_code |= chopper::count::execute(config); // todo make sure this file is already stored, even when similarity does not need to be taken into account.
-        if (config.rearrange_user_bins){ // if similarity must be taken into account, then use count to calculate sketches.
-            exit_code |= chopper::count::execute(config);
-        }
-        exit_code |= chopper::layout::execute(config);
+        exit_code |= chopper::layout::execute(layout_arguments);
     }
     catch (sharg::parser_error const & ext){    // GCOVR_EXCL_START
         std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
     }
 }
+// TODO CODE: filenames_children in hierarchical_i .hpp should not return an empty string
 
-    /*!\brief Creates a configuration object which is passed to hierarchical build function.
- * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
- * \author Myrthe
- */
+//        exit_code |= chopper::count::execute(config);
+//        if (config.rearrange_user_bins){ // if similarity must be taken into account, then use count to calculate sketches.
+//            exit_code |= chopper::count::execute(config);
+//        }
+
+/*!\brief Creates a configuration object which is passed to hierarchical build function.
+* \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
+* \author Myrthe
+*/
 build_arguments build_config(std::string subtree_bin_paths, update_arguments const & update_arguments, chopper::configuration layout_arguments){
     build_arguments build_arguments{};
     build_arguments.kmer_size = 20;
@@ -208,7 +215,11 @@ build_arguments build_config(std::string subtree_bin_paths, update_arguments con
     return build_arguments;
 }
 
-
+/*!\brief Calls the layout algorithm from the chopper library
+* \param[in] layout_arguments configuration object with parameters required for calling the layout algorithm
+* \warning an extra enter/return at the start of the bin file will cause segmentation faults in chopper.
+* \author Myrthe
+*/
 template <seqan3::data_layout data_layout_mode>
 void call_build(build_arguments & arguments, raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index){
     hibf::build_data<data_layout_mode> data{};
@@ -218,12 +229,15 @@ void call_build(build_arguments & arguments, raptor_index<hierarchical_interleav
         bin_path.push_back(std::vector<std::string>{data.hibf.user_bins.filename_of_user_bin(i)});
     index.ibf() = std::move(data.hibf); //instead of creating the index object here.
 }
-
+/*!\brief Helper function that removes the given indices from a vector.
+* \author Myrthe Willemsen
+*/
 template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_remove, std::vector<T> & vector) {
         for (int i : indices_to_remove) {
-            vector.erase(vector.begin() + i);
+            vector.erase(vector.begin() + i); // TODO CHECK: Does this work properly?
         }
     }
+
 /*!\brief Prunes subtree from the original HIBF
  * \details One should remove the IBFs in the original index which were part of the subtree that had to be rebuild.
  * If using some sort of splitting, then removing only needs to happen once since both new subindexes share the same original ibfs.
@@ -233,9 +247,9 @@ template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_
  */
 
 void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
-    // 1.1 which original indices in the IBF were the subindex that had to be rebuild?
+    // Store which original indices in the IBF were the subindex that had to be rebuild?
     std::unordered_set<size_t> indices_to_remove = index.ibf().ibf_indices_childeren(ibf_idx);
-    // 1.2 create a map that maps remaining IBF indices of the original HIBF to their original indices
+    // Create a map that maps remaining IBF indices of the original HIBF to their original indices
     std::vector<int> indices_map; int counter = 0;// Initialize the result vector
     for (int i = 1; i <= index.ibf().ibf_vector.size(); i++) {
         if (indices_to_remove.find(i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
@@ -243,13 +257,13 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
             counter += 1;
         }
     };
-    // 1.3 remove vectors of indices of subindex datastructures like next_ibf and previous_ibf
-    remove_indices(indices_to_remove, index.ibf().ibf_vector); ////ASK do it for all at once?  auto Printer = [](auto&& remove_indices, std::unordered_set<size_t>&& indices_to_remove, auto&&... args) { (remove_indices(indices_to_remove, args),... );  }; Printer(remove_indices, indices_to_remove, index.ibf().next_ibf_id, index.ibf().previous_ibf_id); // https://ngathanasiou.wordpress.com/2015/12/15/182/
+    // Remove vectors of indices of subindex datastructures like next_ibf and previous_ibf
+    remove_indices(indices_to_remove, index.ibf().ibf_vector);
     remove_indices(indices_to_remove, index.ibf().next_ibf_id);
     remove_indices(indices_to_remove, index.ibf().previous_ibf_id);
     remove_indices(indices_to_remove, index.ibf().fpr_table);
     remove_indices(indices_to_remove, index.ibf().occupancy_table);
-    // 1.4 and replace the indices that have to be replaced.
+    // Replace the indices that have to be replaced.
     for (size_t ibf_idx{0}; ibf_idx < index.ibf().next_ibf_id.size(); ibf_idx++) {
         for (size_t i{0}; i < index.ibf().next_ibf_id[ibf_idx].size(); ++i){
             auto & next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][i];
@@ -264,25 +278,28 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
 
 /*!\brief Merges the original HIBF with the pruned subtree, with the rebuild subtree.
  * \details One should remove the IBFs in the original index which were part of the subtree that had to be rebuild.
- * When doing some sort of splitting, run this function twice.
+ * When doing some sort of splitting on the merged bins, run this function twice, once for each subindex.
  * \param[in|out] index the original HIBF
  * \param[in] subindex the HIBF subtree that has been rebuild
  * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed. (irrelevant?)
  * \param[in] index_tuple the index of the IBF and the bin index of the MB to which the subtree needs to be attached.
  * \author Myrthe Willemsen
  */
-void attach_subindex(raptor_index<index_structure::hibf> & index, raptor_index<index_structure::hibf> & subindex, std::tuple<size_t, size_t> index_tuple){
-
-    // 1.5 add the new rows, do this for each subindex!
+void attach_subindex(raptor_index<index_structure::hibf> & index,
+                     raptor_index<index_structure::hibf> & subindex,
+                     std::tuple<size_t, size_t> index_tuple){
+    // Add new rows representing the subindex.
     size_t ibf_count_before_appending = index.ibf().ibf_count();
-    for (size_t ibf_idx{0}; ibf_idx < subindex.ibf().next_ibf_id.size(); ++ibf_idx){ // add size of index.ibf().ibf_vector to all in subindex's next_ibf_id.
+    for (size_t ibf_idx{0}; ibf_idx < subindex.ibf().next_ibf_id.size(); ++ibf_idx){ // Add the size of the `index`, in number of IBFs, to all IBF indices in subindex's next_ibf_id.
         std::for_each(subindex.ibf().next_ibf_id[ibf_idx].begin(), subindex.ibf().next_ibf_id[ibf_idx].end(),
-                      [ibf_count_before_appending](int d) {d += ibf_count_before_appending; ;});
+                      [ibf_count_before_appending](int next_ibf) {next_ibf += ibf_count_before_appending; ;});
+        std::get<0>(subindex.ibf().previous_ibf_id[ibf_idx]) += ibf_count_before_appending;// Add the size of the `index`, in number of IBFs, to the IBF indices present in previous_ibf_id of the subindex.
     }
-    for (size_t ibf_idx{0}; ibf_idx < subindex.ibf().next_ibf_id.size(); ++ibf_idx){ // add size of index.ibf().ibf_vector to the ibf_incices present in previous_ibf_id of nex.
-        std::for_each(subindex.ibf().next_ibf_id[ibf_idx].begin(), subindex.ibf().next_ibf_id[ibf_idx].end(),
-                      [ibf_count_before_appending](int d) {d += ibf_count_before_appending; ;}); // todo: check if adding int to size_t gives no problems.
-    }
+//    std::for_each(subindex.ibf().previous_ibf_id.begin(), subindex.ibf().previous_ibf_id.end(),
+//                      [ibf_count_before_appending](std::tuple<size_t, size_t> previous_idx_tuple)
+//                      {std::get<0>(previous_idx_tuple) += ibf_count_before_appending; ;});
+// TODO CHECK: check for both loops if they values are actually updated
+// TODO CODE: update ibf_sizes for the subindex / complete index.
     auto append_to_vector = [] (auto index_vector, auto subindex_vector){
         index_vector.insert(index_vector.end(), subindex_vector.begin(), subindex_vector.end());
     };
@@ -292,13 +309,11 @@ void attach_subindex(raptor_index<index_structure::hibf> & index, raptor_index<i
     append_to_vector(index.ibf().fpr_table, subindex.ibf().fpr_table);
     append_to_vector(index.ibf().occupancy_table, subindex.ibf().occupancy_table);
 
-
-    // 1.6 update the pointer in the 1 or 2 cells that should contain our new index.
+    // Update the indices in one entry of the supporting tables, where are subindex must be attached, such that they refer to our new subindex.
     auto ibf_idx = std::get<0>(index_tuple);
     auto bin_idx = std::get<1>(index_tuple);
     index.ibf().next_ibf_id[ibf_idx][bin_idx] = ibf_count_before_appending;
     index.ibf().previous_ibf_id[ibf_count_before_appending] = std::make_tuple(ibf_idx, bin_idx);
-
 }
 
 } // namespace raptor

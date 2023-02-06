@@ -17,12 +17,11 @@ namespace raptor
 {
 //void split_ibf(size_t ibf_idx,
 //                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
-chopper::configuration  layout_config(std::string subtree_bin_paths,
-                                      raptor_index<index_structure::hibf> & index,
-                                      update_arguments const & arguments);
+chopper::configuration  layout_config(raptor_index<index_structure::hibf> & index,
+                                      update_arguments const & arguments,
+                                      const std::string & bin_paths);
 
-void call_layout(raptor_index<index_structure::hibf> & index,
-                 chopper::configuration & arguments);
+void call_layout(chopper::configuration & arguments);
 
 void get_kmer_counts(raptor_index<index_structure::hibf> & index,
                      std::set<std::string> filenames,

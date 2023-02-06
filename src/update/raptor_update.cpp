@@ -14,7 +14,7 @@
 
 namespace raptor
 {
-
+//TODO add documentation
 void raptor_update(update_arguments const & arguments)
 {    if (arguments.is_hibf) // and not arguments.compressed remove arguments.compressed later, when decompressing is effective.
     {
