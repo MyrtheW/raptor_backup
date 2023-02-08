@@ -16,19 +16,17 @@ namespace raptor
 {
 
 struct update_arguments
-{  //TODO documentation
-    // TODO which arguments are needed for updating, and which can be stored as part of the IBF
-    //!\brief
+{
     uint32_t window_size{};
-    //!\brief
     uint8_t kmer_size{};
-    //!\brief
     seqan3::shape shape{};
-    //!\brief
     uint8_t parts{1u};
-
     //!\brief The index is compressed
     bool compressed{false};
+    //!\brief Bin files are extracted from the `bin_file` and stored here.
+    std::vector<std::vector<std::string>> bin_path{};
+    bool is_minimiser{false};
+    // Note, the above: `window_size`, `compressed`, `parts`,  `bin_path` and `shape` stored as part of the `index` datastructure. Adding them as input again is redundant. `kmer_size` could be obtained from `shape`,
 
     //!\brief The index is an HIBF
     bool is_hibf{false};
@@ -36,8 +34,12 @@ struct update_arguments
     //!\brief The percentage of empty bins sampled during layout computation.
     double empty_bin_percentage{0.1};
 
-    //!\brief Should updates account for sequence similarities.
+    //!\brief Should updates account for sequence similarities, similar to setting the `rearrange_user_bins` argument in the layout algorithm.
     bool similarity{false};
+
+    //!\brief Maximum number of technical bins per IBF. Needed for layouting.
+    double tmax{64};
+
 
     // Following arguments are mutually exclusive and indicate what update operation should be performed
     bool delete_ubs{false};
@@ -51,12 +53,6 @@ struct update_arguments
     std::filesystem::path out_file{};
     std::filesystem::path sketch_directory{"sketches"};
     std::string insert_sequence_appendix{"_insertsequences"};
-
-    //!\brief
-    std::vector<std::vector<std::string>> bin_path{};
-
-    //!\brief
-    bool is_minimiser{false}; //Myrthe 14.10
 };
 
 } // namespace raptor

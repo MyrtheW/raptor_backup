@@ -75,28 +75,28 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
      parser.add_option(arguments.sketch_directory,
                       sharg::config{.short_id = '\0',
                                     .long_id = "sketch-directory",
-                                    .description = "",
-                                    .advanced = true},
+                                    .description = "If sketches should be used during rebuilding then provide their file directory",
+                                    .advanced = true,
                                     .validator = sharg::input_directory_validator{}});
 
      parser.add_flag(arguments.similarity,
                       sharg::config{.short_id = '\0',
                                     .long_id = "sequence-similarity",
-                                    .description = "",
-                                    .advanced = true}});
+                                    .description = "I user bins should be rearranged based on sequence similarity during rebuilding",
+                                    .advanced = true});
 
      parser.add_option(arguments.empty_bin_percentage,
                       sharg::config{.short_id = '\0',
                                     .long_id = "empty-bin-sampling",
                                     .description = "The percentage of empty bins sampled during layout computation. Default: 0.1",
-                                    .advanced = true},
+                                    .advanced = true,
                                     .validator = sharg::arithmetic_range_validator{0, 1}});
 
      parser.add_option(arguments.insert_sequence_appendix,
                       sharg::config{.short_id = '\0',
-                                    .long_id = "sketch-directory",
-                                    .description = "sequence-insertions-appendix",
-                                    .advanced = true}});
+                                    .long_id = "sequence-insertions-appendix",
+                                    .description = "User bin file appendix when inserting sequences in existing UBs",
+                                    .advanced = true});
 
 }
 

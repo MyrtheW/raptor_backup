@@ -100,8 +100,7 @@ void insert_ubs(update_arguments const & update_arguments,
 void insert_sequences(update_arguments const & update_arguments, raptor_index<index_structure::hibf> & index){
     robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
     for  (auto &filename: update_arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
-            // Check if filename exists in the UBs
-        if (not index.ibf().user_bins.exists_filename(filename[0])){ // Find location of existing user bin, inserts it if it does not exist yet.
+        if (not index.ibf().user_bins.exists_filename(filename[0])){ // Find location of existing user bin. Note that this function inserts it if it does not exist yet.
             std::cout << "The user bin ... that you want to insert to does not exist. If you want to add a new user bin, use the flag -insert-UB";
         }else{
                 std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
@@ -118,10 +117,11 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
                     chopper::configuration layout_arguments = layout_config(index, update_arguments); // Create the arguments to run the layout algorithm with.
                     chopper::count::process_sequence_files(filename, layout_arguments, sketches[0]);
                     chopper::count::write_sketch_file(std::make_pair("_", filename) , sketches[0], layout_arguments);
-            }
-
+                }
+        }
     }
 }
+
 
 
 //DELETE SEQUENCES
@@ -145,13 +145,14 @@ void delete_sequences(update_arguments const & arguments,
 //DELETE UBS
 
 // deleting the actual sequence file and from all_bins_path is to the user. ?
-void delete_ubs(update_arguments const & arguments,
+void delete_ubs(update_arguments const & update_arguments,
                   raptor_index<index_structure::hibf> & index){
-    for  (auto &filename: arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
+    for  (auto &filename: update_arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
         delete_ub(filename, index); // delete a single user bin from the index.
 
         if (update_arguments.sketch_directory != ""){ // if sketches are used, then delete the sketch of this UB.
-            std::filesystem::path path = update_arguments.sketch_directory / std::filesystem::path(filename).stem() + ".hll";
+            std::filesystem::path path = update_arguments.sketch_directory / std::filesystem::path(filename[0]).stem();
+            path += ".hll";
             std::filesystem::remove(path);
         }
     }
@@ -188,7 +189,7 @@ void delete_ub(std::vector<std::string> const & filename,
 
 //TRAVERSE HIBF
 size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_structure::hibf> & index, size_t ibf_idx =0){ //default is root_idx =0, where we start the search.
-    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] auto test = index.ibf().ibf_max_kmers(ibf_idx); //todo remove
+    auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
     if (index.ibf().ibf_max_kmers(ibf_idx) > kmer_count){ // kmer-capacity of IBF > bin size new UB, go down if possible. Instead of maximal capcity, you can calculate the optimal kmer_ size.
         size_t best_mb_idx = ibf.bin_count(); double best_fpr = 1; // initialize the best idx outside of the ibf, such that we can use this after the loop to check if a MB was found.
          for (size_t bin_idx=0; bin_idx < ibf.bin_count(); ++bin_idx){ //loop over bins to find the bext merged bin

@@ -102,18 +102,29 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     write_filenames(subtree_bin_paths_filename, filenames_subtree);
     chopper::configuration layout_arguments = layout_config(index, update_arguments, subtree_bin_paths_filename); // create the arguments to run the layout algorithm with.
     //1.3) Possibly obtain the kmer count and store together with the filenames as text file.
-    get_kmer_counts(index, filenames_subtree, layout_arguments.count_filename); // this works
+    get_kmer_counts(index, filenames_subtree, layout_arguments.count_filename);
     //2) call chopper layout on the stored filenames.
     call_layout(layout_arguments);
     //3) call hierarchical build.
     raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(subtree_bin_paths_filename, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
     call_build(build_arguments, subindex);
+    // 3.2) initialize additional datastructures for the subindex.
+    subindex.ibf().user_bins.initialize_filename_position_to_ibf_bin();
+    subindex.ibf().initialize_previous_ibf_id();
+    subindex.ibf().initialize_ibf_sizes();
+    // fpr and occupancy table are not initialized, apart from with 0's (bcs fprmax is 0?)? But why is the occupancy table assigned with 0s
+
+
     //4) merge the index of the HIBF of the newly obtained subtree with the original index.
     std::tuple<size_t, size_t> index_tuple_previous_ibf = index.ibf().previous_ibf_id[ibf_idx];     // without splitting:
     remove_ibfs(index, ibf_idx);
     attach_subindex(index, subindex, index_tuple_previous_ibf);
-
+    // update datastructures
+    index.ibf().initialize_ibf_sizes();
+    index.ibf().user_bins.initialize_filename_position_to_ibf_bin();
+    // remove temporary files
+    std::filesystem::remove_all("tmp");
 }
 
 /*!\brief Store kmer or minimizer counts for each specified file stored within the HIBF.
@@ -129,7 +140,7 @@ void get_kmer_counts(raptor_index<index_structure::hibf> & index, std::set<std::
     for (std::string const & filename : filenames){
         if (std::filesystem::path(filename).extension() !=".empty_bin"){
                 int kmer_count = index.ibf().get_occupancy_file(const_cast<std::string &>(filename));
-                out_stream << filename + ' ' + std::to_string(kmer_count) + '\n';
+                out_stream << filename + '\t' + std::to_string(kmer_count) + '\t' + filename + '\n' ;
         }
     }
 }
@@ -156,24 +167,19 @@ void write_filenames(std::string bin_path, std::set<std::string> user_bin_filena
  */
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
                                      update_arguments const & update_arguments,
-                                     const std::string& bin_paths = ""
-                                     ){
-    seqan3::test::tmp_filename const input_prefix{"temporary_layouting_files"};
-    seqan3::test::tmp_filename const layout_file{"layout.tsv"};
-
-    chopper::configuration config{};     // raptor layout --num-hash-functions 2 --false-positive-rate 0.05 --input-file all_bin_paths.txt --output-filename hibf_12_12_ebs.layout --rearrange-user-bins --kmer-size 20 --tmax 64 --update-UBs 0.10
-    // files: input of bins paths or count file. For now bin_paths.
-    config.input_prefix = input_prefix.get_path();
+                                     const std::string& bin_paths){
+    std::filesystem::create_directories("tmp");
+    chopper::configuration config{};
+    config.input_prefix = "tmp/temporary_layout"; // all temporary files ill be stored in the temporary folder. //input_prefix.get_path();
     config.output_prefix = config.input_prefix;
-    config.output_filename = layout_file.get_path(); // TODO CHECK: if this works, otherwise return to "layout2.tsv"; "temporary_layouting_files" for input_prefix.
-    config.data_file = bin_paths;
+    config.output_filename = config.input_prefix + ".tsv";
+    config.data_file = bin_paths; // input of bins paths
     chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory); // here the count filename and output_prefix are set.
     config.sketch_directory = update_arguments.sketch_directory;
     config.rearrange_user_bins = update_arguments.similarity; // indicates whether updates should account for user bin's similarities.
     config.update_ubs = update_arguments.empty_bin_percentage; // percentage of empty bins drawn from distributions //makes sure to use empty bins.
-
-    config.tmax = index.ibf().t_max;
-    config.false_positive_rate = index.ibf().fpr_max;
+    config.tmax = update_arguments.tmax;
+    config.false_positive_rate = 0.05; //index.ibf().fpr_max; // TODO set back to index.fpr after building a new index.
 
     return config;
 }
@@ -194,12 +200,6 @@ void call_layout(chopper::configuration & layout_arguments){
         std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
     }
 }
-// TODO CODE: filenames_children in hierarchical_i .hpp should not return an empty string
-
-//        exit_code |= chopper::count::execute(config);
-//        if (config.rearrange_user_bins){ // if similarity must be taken into account, then use count to calculate sketches.
-//            exit_code |= chopper::count::execute(config);
-//        }
 
 /*!\brief Creates a configuration object which is passed to hierarchical build function.
 * \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
@@ -209,7 +209,7 @@ build_arguments build_config(std::string subtree_bin_paths, update_arguments con
     build_arguments build_arguments{};
     build_arguments.kmer_size = 20;
     build_arguments.window_size = 23;
-    build_arguments.fpr = 0.05; //index.false_positive_rate
+    build_arguments.fpr = layout_arguments.false_positive_rate; //index.false_positive_rate
     build_arguments.is_hibf = true;
     build_arguments.bin_file = layout_arguments.output_filename; //layout_file
     return build_arguments;
@@ -234,7 +234,7 @@ void call_build(build_arguments & arguments, raptor_index<hierarchical_interleav
 */
 template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_remove, std::vector<T> & vector) {
         for (int i : indices_to_remove) {
-            vector.erase(vector.begin() + i); // TODO CHECK: Does this work properly?
+            vector.erase(vector.begin() + i); // TODO CHECK: Does this work properly when removing multiple IBF indices? cause it  might delete too high indices on the way..
         }
     }
 
@@ -242,14 +242,14 @@ template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_
  * \details One should remove the IBFs in the original index which were part of the subtree that had to be rebuild.
  * If using some sort of splitting, then removing only needs to happen once since both new subindexes share the same original ibfs.
  * \param[in|out] index the original HIBF
- * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed.
+ * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed, including the ibf_idx itself.
  * \author Myrthe Willemsen
  */
 
 void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     // Store which original indices in the IBF were the subindex that had to be rebuild?
-    std::unordered_set<size_t> indices_to_remove = index.ibf().ibf_indices_childeren(ibf_idx);
-    // Create a map that maps remaining IBF indices of the original HIBF to their original indices
+    std::unordered_set<size_t> indices_to_remove = index.ibf().ibf_indices_childeren(ibf_idx);  // Create a map that maps remaining IBF indices of the original HIBF to their original indices
+    indices_to_remove.insert(ibf_idx);
     std::vector<int> indices_map; int counter = 0;// Initialize the result vector
     for (int i = 1; i <= index.ibf().ibf_vector.size(); i++) {
         if (indices_to_remove.find(i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
@@ -263,6 +263,8 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     remove_indices(indices_to_remove, index.ibf().previous_ibf_id);
     remove_indices(indices_to_remove, index.ibf().fpr_table);
     remove_indices(indices_to_remove, index.ibf().occupancy_table);
+    remove_indices(indices_to_remove, index.ibf().user_bins.ibf_bin_to_filename_position);
+    index.ibf().ibf_sizes.erase(index.ibf().ibf_sizes.begin());
     // Replace the indices that have to be replaced.
     for (size_t ibf_idx{0}; ibf_idx < index.ibf().next_ibf_id.size(); ibf_idx++) {
         for (size_t i{0}; i < index.ibf().next_ibf_id[ibf_idx].size(); ++i){
@@ -291,16 +293,16 @@ void attach_subindex(raptor_index<index_structure::hibf> & index,
     // Add new rows representing the subindex.
     size_t ibf_count_before_appending = index.ibf().ibf_count();
     for (size_t ibf_idx{0}; ibf_idx < subindex.ibf().next_ibf_id.size(); ++ibf_idx){ // Add the size of the `index`, in number of IBFs, to all IBF indices in subindex's next_ibf_id.
-        std::for_each(subindex.ibf().next_ibf_id[ibf_idx].begin(), subindex.ibf().next_ibf_id[ibf_idx].end(),
-                      [ibf_count_before_appending](int next_ibf) {next_ibf += ibf_count_before_appending; ;});
-        std::get<0>(subindex.ibf().previous_ibf_id[ibf_idx]) += ibf_count_before_appending;// Add the size of the `index`, in number of IBFs, to the IBF indices present in previous_ibf_id of the subindex.
+        for (size_t bin_idx{0}; bin_idx < subindex.ibf().next_ibf_id[ibf_idx].size(); ++bin_idx){
+             subindex.ibf().next_ibf_id[ibf_idx][bin_idx] += ibf_count_before_appending;
+        }
+        std::get<0>(subindex.ibf().previous_ibf_id[ibf_idx]) += ibf_count_before_appending; // Add the size of the `index`, in number of IBFs, to the IBF indices present in previous_ibf_id of the subindex.
     }
-//    std::for_each(subindex.ibf().previous_ibf_id.begin(), subindex.ibf().previous_ibf_id.end(),
-//                      [ibf_count_before_appending](std::tuple<size_t, size_t> previous_idx_tuple)
-//                      {std::get<0>(previous_idx_tuple) += ibf_count_before_appending; ;});
-// TODO CHECK: check for both loops if they values are actually updated
-// TODO CODE: update ibf_sizes for the subindex / complete index.
-    auto append_to_vector = [] (auto index_vector, auto subindex_vector){
+
+
+
+
+    auto append_to_vector = [] (auto & index_vector, auto & subindex_vector){
         index_vector.insert(index_vector.end(), subindex_vector.begin(), subindex_vector.end());
     };
     append_to_vector(index.ibf().ibf_vector, subindex.ibf().ibf_vector);
@@ -308,6 +310,8 @@ void attach_subindex(raptor_index<index_structure::hibf> & index,
     append_to_vector(index.ibf().previous_ibf_id, subindex.ibf().previous_ibf_id);
     append_to_vector(index.ibf().fpr_table, subindex.ibf().fpr_table);
     append_to_vector(index.ibf().occupancy_table, subindex.ibf().occupancy_table);
+    append_to_vector(index.ibf().user_bins.ibf_bin_to_filename_position,
+                     subindex.ibf().user_bins.ibf_bin_to_filename_position);
 
     // Update the indices in one entry of the supporting tables, where are subindex must be attached, such that they refer to our new subindex.
     auto ibf_idx = std::get<0>(index_tuple);

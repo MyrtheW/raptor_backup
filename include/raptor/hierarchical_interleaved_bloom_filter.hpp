@@ -141,9 +141,6 @@ public:
     //!\brief Maximum false positive rate for any user bin.
     double fpr_max;
 
-    //!\brief Maximum number of technical bins per IBF.
-    double t_max;
-
     //!\brief Maximum (or optimal) number of k-mers (bin counts) that IBF could hold at that moment. The vector contains tuples of (ibf_size, ibf_idx), sorted by ibf size.
     std::vector<std::tuple<size_t, size_t>> ibf_sizes;
 
@@ -164,7 +161,6 @@ public:
         assert(ibf_vector.size() == occupancy_table.size()); // temporary
         assert(ibf_vector.size() == previous_ibf_id.size()); // temporary
         assert(ibf_vector.size() == fpr_table.size()); // temporary
-        assert(ibf_vector.size() == ibf_sizes.size()); // temporary
         return ibf_vector.size();
     }
 
@@ -415,9 +411,9 @@ public:
      * The table of ibf_sizes is used for one of the UB insertion methods of the dynamic HIBF.
      * \author Myrthe Willemsen
      */
-    void initialize_ibf_sizes(bool max_size=true){
+    void initialize_ibf_sizes(bool max_size=true){     // TODO also check why the ibf_sizes do not display the kmer counts (?) Some occacions it just displayed (1,0).
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
-            ibf_sizes.push_back(std::make_tuple(ibf_sizes[ibf_idx], ibf_max_kmers(ibf_idx)));
+            ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
         }
         sort(ibf_sizes.begin(), ibf_sizes.end());  // Sort by the first element of tuple
     }
@@ -487,7 +483,6 @@ public:
         archive(fpr_table);
         archive(previous_ibf_id);
         archive(fpr_max);
-        archive(t_max);
     }
     //!\endcond
 };
@@ -497,28 +492,21 @@ public:
 template <seqan3::data_layout data_layout_mode>
 class hierarchical_interleaved_bloom_filter<data_layout_mode>::user_bins
 {
-private:
+public:
     //!\brief Contains filenames of all user bins.
     std::vector<std::string> user_bin_filenames;
 
-    /*!\brief Stores for each bin in each IBF of the HIBF the ID of the filename.
-     * \details
-     * Assume we look up a bin `b` in IBF `i`, i.e. `ibf_bin_to_filename_position[i][b]`.
-     * If `-1` is returned, bin `b` is a merged bin, and there is no filename, we need to look into the lower level IBF.
-     * Otherwise, the returned value `j` can be used to access the corresponding filename `user_bin_filenames[j]`.
-     */
-    std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};
-
-    //!\brief Maps filenames to their indices isn the list of filenames
-    std::unordered_map<std::string, uint64_t> filename_to_idx;     //filename --> filename_index
+    //!\brief Maps filenames to their indices in the list of filenames
+    std::unordered_map<std::string, uint64_t> filename_to_idx;
 
 
     /*!\brief Stores for each filename ID each of its bins and corresponding IBF in the HIBF
-     * \details
+     * \details //TODO DOC
      * .
      */
     std::vector<std::tuple<uint64_t, uint64_t, uint16_t>> filename_position_to_ibf_bin{}; // filename index --> (ibf_idx, bin_idx, number_of_bins)
-public:
+
+
     //!\brief Creates
     void initialize_filename_position_to_ibf_bin()
     {
@@ -679,7 +667,13 @@ public:
         archive(ibf_bin_to_filename_position);
     }
     //!\endcond
-};
+/*!\brief Stores for each bin in each IBF of the HIBF the ID of the filename.
+ * \details
+ * Assume we look up a bin `b` in IBF `i`, i.e. `ibf_bin_to_filename_position[i][b]`.
+ * If `-1` is returned, bin `b` is a merged bin, and there is no filename, we need to look into the lower level IBF.
+ * Otherwise, the returned value `j` can be used to access the corresponding filename `user_bin_filenames[j]`.
+ */
+std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};};
 
 /*!\brief Manages membership queries for the hibf::hierarchical_interleaved_bloom_filter.
  * \see hibf::hierarchical_interleaved_bloom_filter::user_bins::filename_of_user_bin
