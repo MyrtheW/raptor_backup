@@ -11,17 +11,21 @@
 namespace raptor
 {
 
-/*!\brief Finds a new location
- * \details The algorithm //TODO
+/*!\brief Finds a location in the HIBF for a new UB.
+ * \details The algorithm finds a suitable location in the existing HIBF for a new UB, by .
+ * 1) looking for a proper IBF with one of the three algorithms
+ * 2) calculating the number of TBs needed to insert the UB in this IBF
+ * 3) finding the bin_idx in the
  * \param[in] kmers the set of kmers to be stored
  * \param[in] index the original HIBF
- * \param[out] ibf_idx, bin_idx, number_of_bins A index triple of the index of IBF, start index of the technical bins, and the number of bins
+ * \return ibf_idx, bin_idx, number_of_bins An index triple of the index of IBF, start index of the technical bins, and the number of bins
  * \author Myrthe
  */
 std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_hood::unordered_flat_set<size_t> &kmers,
                                                        raptor_index<index_structure::hibf> & index){
     size_t root_idx = 0;
     size_t ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
+    // TODO: change to some input argument, to decide which function to use.
     //size_t ibf_idx = find_ibf_idx_ibf_size(kmers.size(, index); // OR OTHER FIND LOCATION ALGORITHM
     //size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // OR OTHER FIND LOCATION ALGORITHM
     size_t number_of_bins = 1; // calculate number of user bins needed.
@@ -34,12 +38,16 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
 
 
 /*!\brief Inserts a UB in the assigned TBs and its parent MBs in higher level IBFs
- * \details The algorithm //TODO
+ * \details The algorithm inserts the UB in the leave bins (LBs) and parent merged bins
+ * iteratively until reaching the root ibf at the top level. For each level the function
+ * `insert_into_ibf` will be called. This function updates the `rebuild_index_tuple`, indicating
+ * whether part of the index needs to be rebuild. This is initialized with the ibf_idx being the HIBF size.
  * \param[in] kmers the set of kmers to be stored
- * \param[in] index_triple
+ * \param[in] index_triple (ibf_idx, bin_idx, number_of_bins) indicating where the UB needs to be inserted.
  * \param[in] index the original HIBF
- * \param[out] rebuild_index_tuple
- * \author Myrthe
+ * \return rebuild_index_tuple containing (ibf_idx, bin_idx). If the ibf_idx is lower than the total number of IBFs,
+ * then the respective IBF needs to be rebuild.
+ * \author Myrthe Willemsen
  */
 std::tuple <uint64_t, uint64_t> insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers,
                                                       std::tuple <uint64_t, uint64_t, uint16_t> & index_triple,
@@ -73,7 +81,8 @@ void insert_ubs(update_arguments const & update_arguments,
             size_t kmer_count = kmers.size();
             std::tuple <uint64_t, uint64_t, uint16_t> index_triple = get_location(kmer_count, kmers, index);       //  index_triple; bin_idx, ibf_idx, number_of_bins
             std::tuple <uint64_t, uint64_t> rebuild_index_tuple = insert_tb_and_parents(kmers,  index_triple, index);
-            if (std::get<0>(rebuild_index_tuple) == index.ibf().ibf_vector.size()) partial_rebuild(rebuild_index_tuple, index, update_arguments);
+            if (std::get<0>(rebuild_index_tuple) < index.ibf().ibf_vector.size()) // If the ibf_idx is lower than the total number of IBFs (the initilization value), then the respective IBF needs to be rebuild.
+                partial_rebuild(rebuild_index_tuple, index, update_arguments);
 
             //Compute and store sketches for the new UBs
             chopper::configuration layout_arguments = layout_config(index, update_arguments); // This creates the arguments to be able to compute and write the sketch. The bin path filename is not relevant here.
@@ -98,7 +107,7 @@ void insert_ubs(update_arguments const & update_arguments,
  * \author Myrthe Willemsen
  */
 void insert_sequences(update_arguments const & update_arguments, raptor_index<index_structure::hibf> & index){
-    robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
+    robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize k-mers.
     for  (auto &filename: update_arguments.bin_path){ // loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
         if (not index.ibf().user_bins.exists_filename(filename[0])){ // Find location of existing user bin. Note that this function inserts it if it does not exist yet.
             std::cout << "The user bin ... that you want to insert to does not exist. If you want to add a new user bin, use the flag -insert-UB";
@@ -108,8 +117,8 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
                 std::string filename_new_sequences = filename[0] + update_arguments.insert_sequence_appendix;
                 raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename_new_sequences});
                 std::tuple <uint64_t, uint64_t> rebuild_index_tuple = insert_tb_and_parents(kmers,  index_triple, index);
-                if (std::get<0>(rebuild_index_tuple) == index.ibf().ibf_vector.size())
-                    partial_rebuild(rebuild_index_tuple, index, update_arguments);
+                if (std::get<0>(rebuild_index_tuple) < index.ibf().ibf_vector.size()) // If the ibf_idx is lower than the total number of IBFs (the initilization value), then the respective IBF needs to be rebuild.
+                    partial_rebuild(rebuild_index_tuple, index, update_arguments, 2);
 
                 if (update_arguments.sketch_directory != ""){ // if sketches are used, then update the sketch of this UB.
                     std::vector<chopper::sketch::hyperloglog> sketches;
@@ -124,7 +133,17 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
 
 
 
-//DELETE SEQUENCES
+/*!\brief Delete sequences from UBs //TODO DOC & TODO CODE
+ * \details The algorithm inserts new sequence content in the technical bins of an existing sample,
+ * If sketches are used, then also the sketch of this UB is updated.
+ * \guideline The user can provide a file specifically containing the part of the sequence that should be added, not the whole sequence.
+ * By default this file ends with "_insertsequences", but can be set to a different appendix
+ * If this is not possible, the user can provide the
+ * I should update hyperloglog sketches, wheres the user: updates sequence files yourself., e.g. using cat.
+ * \param[in] kmers the set of kmers to be stored
+ * \param[in] index the original HIBF
+ * \author Myrthe Willemsen
+ */
 void delete_sequences(update_arguments const & arguments,
                   raptor_index<index_structure::hibf> & index){
     robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
@@ -137,6 +156,7 @@ void delete_sequences(update_arguments const & arguments,
                 raptor::hibf::compute_kmers(kmers, arguments, filename); // or  std::vector<std::string> filename2 = {{filename}};
                 //update occupancy table
                 // check if rebuild is required --> rebuild the UB rather than splitting it.
+                // create new sketch.
             }
 
     }
@@ -161,12 +181,10 @@ void delete_ubs(update_arguments const & update_arguments,
 /*!\brief Delete a single user bin from the index.
  * \param[in] filename filename of the user bin to be removed.
  * \param[in] index The HIBF.
- * \details
- * // try inserting in the first EB encountered. improve using empty bin datastructure and rank operation.
- * // then there is no empty bin, the IBF must be resized.  TODO
+ * \details Delete a single UB by deleting one ore more leaf bins,
+ * with the help of the the `delete_tbs` function.
  * \author Myrthe Willemsen
  */
-
 void delete_ub(std::vector<std::string> const & filename,
                     raptor_index<index_structure::hibf> & index){
 
@@ -187,7 +205,15 @@ void delete_ub(std::vector<std::string> const & filename,
 
 
 
-//TRAVERSE HIBF
+/*!\brief Finds an appropiate IBF for a UB insertion based on FPR.
+ * \param[in] kmer_count The number of k-mers to be inserted.
+ * \param[in] ibf_idx The IBF index of the current IBF. Should be the root (0) at the start of the traversal.
+ * \param[in] index The HIBF.
+ * \return the IBF index which is best appropiate based on the FPR, using the FPR table.
+ * \details the merged bin with the lowest false positive rate is selected.
+ * The algorithm recurses until an IBF's bin size is too small to accommodate the new UB.
+ * \author Myrthe Willemsen
+ */
 size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_structure::hibf> & index, size_t ibf_idx =0){ //default is root_idx =0, where we start the search.
     auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
     if (index.ibf().ibf_max_kmers(ibf_idx) > kmer_count){ // kmer-capacity of IBF > bin size new UB, go down if possible. Instead of maximal capcity, you can calculate the optimal kmer_ size.
@@ -212,6 +238,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
     }
     }
 
+    //!\brief Takes a number and calculates the next multiple of 64
 [[nodiscard]] constexpr size_t next_multiple_of_64(size_t const value) noexcept
 {
     return ((value + 63) >> 6) << 6;
@@ -230,7 +257,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
 uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t ibf_idx, size_t number_of_bins){
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
     size_t bin_idx=0; // The variable is initialized outside the for loop, such that afterwards it can still be used.
-    for (; bin_idx < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
+    for (; bin_idx + number_of_bins < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
         if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx],
                         &index.ibf().occupancy_table[ibf_idx][bin_idx+number_of_bins])==0){ //empty bin
             break;
@@ -247,7 +274,7 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
     /*!\brief Finds an appropiate IBF for a UB insertion based on the number of k-mers and IBF sizes.
      * \param[in] kmer_count The number of k-mers to be inserted.
      * \param[in] index The HIBF.
-     * \return true if value already existed in the bin, i.e. at all hashes the value in de bin was set to 1 already.
+     * \return the IBF index to insert the new UB in.
      * \details A second algorithm picks the IBF that has the smallest size able to store the UB without it being split.
      * It finds this IBF by doing a binary search on a sorted array with IBF bin sizes in terms of the number of
      * $k$-mers that they can maximally store, and the corresponding IBF indexes. The search is logarithmic in the time of the number of IBFs,
@@ -274,7 +301,7 @@ size_t find_ibf_idx_ibf_size(size_t & kmer_count, raptor_index<index_structure::
      * \param[in] kmers The kmers to be inserted.
      * \param[in] ibf_idx The IBF index of the current IBF. Should be the root (0) at the start of the traversal.
      * \param[in] index The HIBF.
-     * \return true if value already existed in the bin, i.e. at all hashes the value in de bin was set to 1 already.
+     * \return ibf_idx of the IBF to insert the new UB in.
      * \details the merged bin with the maximal similarity is selected.
      * The algorithm recurses until an IBF's bin size is too small to accommodate the new UB.
      * The similarities to all TBs in each traversed IBF are approximated by querying a percentage of the k-mers from the new UBs.
@@ -302,7 +329,7 @@ size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t
             auto next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][best_mb_idx]; //next_ibf_id[ibf_id_high].size()
             return (find_ibf_idx_traverse_by_similarity(kmers, index, next_ibf_idx));
         }
-    }else{ // kmer-capacity of IBF < bin size new UB, go up if possible
+    }else{ // if the kmer-capacity of the IBF is lower than the required bin size for the new UB, then go up if possible
         return(std::get<0>(index.ibf().previous_ibf_id[ibf_idx])); //ibf idx of merged bin a level up. If it is a root, it will automatically return the root index = 0
     }
 }

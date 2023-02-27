@@ -3,6 +3,7 @@
 #include <raptor/upgrade/get_fpr.hpp>
 #include "raptor/build/store_index.hpp"
 
+// TODO this file is old  and can be deleted.
 //#include upgrade file
 //namespace raptor::hibf{
 //    void some_function(std::string filename){

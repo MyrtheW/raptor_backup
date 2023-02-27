@@ -9,11 +9,13 @@
 
 #include <raptor/argument_parsing/build_arguments.hpp>
 #include <raptor/build/hibf/build_data.hpp>
+#include <robin_hood.h>
+
 
 namespace raptor::hibf
 {
 
 template <seqan3::data_layout data_layout_mode>
-void create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments);
+robin_hood::unordered_flat_set<size_t> create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments, bool is_root=true);
 
 } // namespace raptor::hibf

@@ -9,8 +9,9 @@
 namespace raptor
 {
 
-/*!\brief Calls the layout algorithm from the chopper library
- * \param[in]
+/*!\brief Loads the stored HIBF into memory.
+ * \remark does not yet work for compressed indexes.
+ * \param[out] index the HIBF
  * \param[in] update_arguments configuration object with parameters required for calling an update operation
  * \author Myrthe
  */

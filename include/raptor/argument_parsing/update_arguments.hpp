@@ -14,7 +14,9 @@
 
 namespace raptor
 {
-
+/*!\brief Arguments required for the Dynamic HIBF.
+* \author Myrthe Willemsen
+*/
 struct update_arguments
 {
     uint32_t window_size{};

@@ -12,24 +12,38 @@
 #include <raptor/build/hibf/build_data.hpp>
 #include <raptor/index.hpp>
 #include <chopper/configuration.hpp>
+#include <robin_hood.h>
+
 
 namespace raptor
 {
 //void split_ibf(size_t ibf_idx,
 //                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
-                                      update_arguments const & arguments,
-                                      const std::string & bin_paths= "");
+                                      update_arguments const & arguments);
 
 void call_layout(chopper::configuration & arguments);
 
-void get_kmer_counts(raptor_index<index_structure::hibf> & index,
-                     std::set<std::string> filenames,
-                     std::filesystem::path count_filename);
+std::vector<std::tuple<size_t, std::string>> get_kmer_counts(
+        raptor_index<index_structure::hibf> & index,
+        std::set<std::string> filenames);
+
+void write_kmer_counts(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
+                       std::filesystem::path count_filename);
+
+std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple,
+           raptor_index<index_structure::hibf> & index,
+           int number_of_splits = 2);
+
+std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split(
+        std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
+        size_t number_of_splits=2);
+
 
 void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                      raptor_index<index_structure::hibf> & index,
-                     update_arguments const & arguments);
+                     update_arguments const & arguments,
+                     int number_of_splits= 2);
 
 void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames);
 
@@ -38,7 +52,7 @@ build_arguments build_config(std::string subtree_bin_paths,
                              chopper::configuration layout_arguments);
 
 template <seqan3::data_layout data_layout_mode>
-void call_build(build_arguments & arguments,
+robin_hood::unordered_flat_set<size_t> call_build(build_arguments & arguments,
                 raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index);
 
 template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_remove, std::vector<T> & vector);

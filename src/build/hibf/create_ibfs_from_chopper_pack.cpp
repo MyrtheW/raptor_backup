@@ -15,7 +15,7 @@ namespace raptor::hibf
 {
 
 template <seqan3::data_layout data_layout_mode>
-void create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments)
+robin_hood::unordered_flat_set<size_t> create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments, bool is_root)
 {
     read_chopper_pack_file(data, arguments.bin_file);
     lemon::ListDigraph::Node root = data.ibf_graph.nodeFromId(0); // root node = high level IBF node
@@ -25,14 +25,16 @@ void create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_ar
     data.compute_fp_correction(t_max, arguments.hash, arguments.fpr);
 
     size_t empty_bin_kmers=0;
-    hierarchical_build(root_kmers, root, data, arguments, true, empty_bin_kmers);
+    hierarchical_build(root_kmers, root, data, arguments, is_root, empty_bin_kmers);
+
+    return root_kmers; // this is used when rebuilding, to insert into the parent merged bin.
 }
 
-template void
+template robin_hood::unordered_flat_set<size_t>
 create_ibfs_from_chopper_pack<seqan3::data_layout::uncompressed>(build_data<seqan3::data_layout::uncompressed> &,
-                                                                 build_arguments const &);
-template void
+                                                                 build_arguments const &, bool is_root);
+template robin_hood::unordered_flat_set<size_t>
 create_ibfs_from_chopper_pack<seqan3::data_layout::compressed>(build_data<seqan3::data_layout::compressed> &,
-                                                               build_arguments const & arguments);
+                                                               build_arguments const & arguments, bool is_root);
 
 } // namespace raptor::hibf

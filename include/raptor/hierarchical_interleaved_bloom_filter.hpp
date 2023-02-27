@@ -172,7 +172,8 @@ public:
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
         auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
-        if (current_filename_index < 0){
+        if (next_ibf_id[ibf_idx][bin_idx]!=ibf_idx){
+            assert(current_filename_index < 0);
             return true;
         }else{ return false;}
     }
@@ -201,12 +202,9 @@ public:
     */
     void delete_tbs(size_t ibf_idx, size_t bin_idx, size_t number_of_bins=1){
         auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
-        for (size_t chunk_number=0; chunk_number < number_of_bins; ++chunk_number)
-        {
-            seqan3::bin_index const bin_index{bin_idx + chunk_number}; // TODO CHECK: if this works. auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin // ibf.clear((seqan3::bin_index const) bin_idx);
-            ibf.clear(bin_index);
-        }
         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
+            seqan3::bin_index const bin_index{bin_idx + offset}; // TODO CHECK: if this works. auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin // ibf.clear((seqan3::bin_index const) bin_idx);
+            ibf.clear(bin_index);
             fpr_table[ibf_idx][bin_idx+offset] = 0;
             occupancy_table[ibf_idx][bin_idx+offset] = 0;
         }
@@ -499,18 +497,25 @@ public:
     //!\brief Maps filenames to their indices in the list of filenames
     std::unordered_map<std::string, uint64_t> filename_to_idx;
 
-
     /*!\brief Stores for each filename ID each of its bins and corresponding IBF in the HIBF
      * \details //TODO DOC
      * .
      */
     std::vector<std::tuple<uint64_t, uint64_t, uint16_t>> filename_position_to_ibf_bin{}; // filename index --> (ibf_idx, bin_idx, number_of_bins)
 
+    /*!\brief Stores for each bin in each IBF of the HIBF the ID of the filename.
+     * \details
+     * Assume we look up a bin `b` in IBF `i`, i.e. `ibf_bin_to_filename_position[i][b]`.
+     * If `-1` is returned, bin `b` is a merged bin, and there is no filename, we need to look into the lower level IBF.
+     * Otherwise, the returned value `j` can be used to access the corresponding filename `user_bin_filenames[j]`.
+     */
+    std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};
 
-    //!\brief Creates
+
+    //!\brief Creates //TODO
     void initialize_filename_position_to_ibf_bin()
     {
-        filename_position_to_ibf_bin.resize(user_bin_filenames.size());
+        filename_position_to_ibf_bin.resize(user_bin_filenames.size()); // User bins should
         std::fill(filename_position_to_ibf_bin.begin(), filename_position_to_ibf_bin.end(), std::make_tuple(0,0,0));
         for (uint64_t idx=0; idx < user_bin_filenames.size(); idx++){ // warning: comparison of integer expressions of different signedness: solve this by declaring idx as size_t ipv int ?  â€˜intâ€™ and â€˜std::vector<std::__cxx11::basic_string<char> >::size_typeâ€™ {aka â€˜long unsigned intâ€™} [-Wsign-compare]
             std::string filename = user_bin_filenames[idx];             // Question: create string view from filename?
@@ -546,7 +551,9 @@ public:
         return filename_position_to_ibf_bin[filename_to_idx[filename]];
     }
 
-    //!\brief Checks if the filename is already present in the HIBF.
+    /*!\brief Checks if the filename is already present in the HIBF.
+     * \author Myrthe Willemsen
+     */
     bool exists_filename(const std::string & filename)
     {
     if (filename_to_idx.find(filename) == filename_to_idx.end())
@@ -555,7 +562,11 @@ public:
         return true; // filename/user bin does already exist in HIBF
     }
 
-    void update_filename_indices(std::string filename, size_t const ibf_idx, size_t const bin_idx, size_t const number_of_bins){
+    /*!\brief TODO
+     * \author Myrthe Willemsen
+     */
+    void update_filename_indices(std::string & filename, size_t const ibf_idx,
+                                 size_t const bin_idx, size_t const number_of_bins){
         user_bin_filenames.push_back(filename); // or resize it first to add filename to the end of "filenames"
         filename_to_idx[filename] = user_bin_filenames.size(); // We should not assume filename_to_idx has the same size as user_bin_filenames, but as we do not remove deleted bins from 'user_bin_filenames' nor from 'filename_position_to_ibf_bin', we should use user_bin_filenames.size()
         // for index_pair in index_pairs:
@@ -563,13 +574,14 @@ public:
         ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ; // possibly resize to update ibf_bin_to_filename_position and filenames
     }
 
+    /*!\brief Deletes a filename from the user bin datastructures
+     * \details Deletes a filename from `user_bin_filenames`, `filename_to_idx` (in which the filename is set to 'empty_bin',
+     * The other two datastructures (`filename_position_to_ibf_bin`, `ibf_bin_to_filename_position`) do not have to be changed now, and will be updated
+     * in a future (partial) rebuild operation).
+     * \author Myrthe Willemsen
+     */
     void delete_filename(const std::string & filename){
-        // --> from user_bin_filenames
-    // --> from filename_to_idx
-    // set to 'empty_bin', is probably cheaper than removing the value? perhaps related to a number?
-    // The other 2 ( ) do not have to be changed per se, but make sure that when inserting a new bin, the 'number of bins' is updated.
-        // put the original cardinality or ibf size instead of x
-        user_bin_filenames[filename_to_idx[filename]] ="x.empty_bin"; //if you delete the item, and decrease the list size, you would have to remake ibf_bin_to_filename_position. Empty bins should also be initiliaze as empty_bin in this list (if building is correct/as should). Check this.
+        user_bin_filenames[filename_to_idx[filename]] ="x.empty_bin"; // One could put the original cardinality or ibf size instead of x, although this does not provide any added value at the moment.
         filename_to_idx.erase(filename);
     }
 
@@ -667,13 +679,7 @@ public:
         archive(ibf_bin_to_filename_position);
     }
     //!\endcond
-/*!\brief Stores for each bin in each IBF of the HIBF the ID of the filename.
- * \details
- * Assume we look up a bin `b` in IBF `i`, i.e. `ibf_bin_to_filename_position[i][b]`.
- * If `-1` is returned, bin `b` is a merged bin, and there is no filename, we need to look into the lower level IBF.
- * Otherwise, the returned value `j` can be used to access the corresponding filename `user_bin_filenames[j]`.
- */
-std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};};
+    };
 
 /*!\brief Manages membership queries for the hibf::hierarchical_interleaved_bloom_filter.
  * \see hibf::hierarchical_interleaved_bloom_filter::user_bins::filename_of_user_bin

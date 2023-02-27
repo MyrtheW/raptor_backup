@@ -11,8 +11,10 @@
 #include <raptor/dna4_traits.hpp>
 #include "raptor/index.hpp"
 
+
 namespace raptor::hibf
 {
+
 
 // automatically does naive splitting if number_of_bins > 1
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
@@ -39,6 +41,14 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     }
 
 }
+/*!\brief Insertions of an UB into an IBF //TODO DOC
+ * \details The algorithm inserts the k-mers of a UB in one or more TBs
+ * \param[in] kmers the set of kmers to be stored
+ * \param[in] index the original HIBF
+ * \param[in] ibf_idx, bin_idx, number_of_bins A index triple of the index of IBF, start index of the technical bins, and the number of bins
+ * \param[in] ibf a  reference to the IBF to insert the
+ * \author Myrthe Willemsen
+ */
 
 // alternative function that uses index as input,
 template <seqan3::data_layout data_layout_mode>
@@ -69,7 +79,6 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 parent_kmers.insert(value);
         }
     }
-    //size_t kmer_count = kmers.size();
     index.update_occupancy_table((size_t) kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
     auto fpr = index.update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
 
@@ -79,7 +88,7 @@ template void insert_into_ibf<seqan3::data_layout::uncompressed>(robin_hood::uno
                      robin_hood::unordered_flat_set<size_t> const & , // kmers or minimizers
                      std::tuple <uint64_t, uint64_t, uint16_t> ,
                      raptor::hierarchical_interleaved_bloom_filter<seqan3::data_layout::uncompressed> & ,
-                              seqan3::interleaved_bloom_filter<> & ,
+                     seqan3::interleaved_bloom_filter<> & ,
                      bool );
 
 template void insert_into_ibf<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> & ,

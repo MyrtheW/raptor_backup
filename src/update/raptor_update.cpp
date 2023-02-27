@@ -14,14 +14,20 @@
 
 namespace raptor
 {
-//TODO add documentation
+/*!\brief Prunes subtree from the original HIBF
+ * \details One should remove the IBFs in the original index which were part of the subtree that had to be rebuild.
+ * If using some sort of splitting, then removing only needs to happen once since both new subindexes share the same original ibfs.
+ * \param[in|out] index the original HIBF
+ * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed, including the ibf_idx itself.
+ * \author Myrthe Willemsen
+ */
 void raptor_update(update_arguments const & arguments)
 {    if (arguments.is_hibf) // and not arguments.compressed remove arguments.compressed later, when decompressing is effective.
     {
         auto index = raptor_index<index_structure::hibf>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
         load_hibf(index, arguments);
 
-        std::tuple<size_t,size_t> index_tuple = std::make_tuple(1, 0);
+        std::tuple<size_t,size_t> index_tuple = std::make_tuple(0, 14);
         partial_rebuild(index_tuple, index, arguments);
 
         if //constexpr
@@ -42,7 +48,8 @@ void raptor_update(update_arguments const & arguments)
     // if arguments.compressed, it should be compressed again
     store_index(arguments.in_file, index, arguments);
     //store_index(arguments.in_file, std::move(index), arguments); // store index
-    //todo: there is a bug in storing the index. Ask Svenja.
+    //todo: there is a bug AFTER storing the index. Ask Svenja. free(): invalid pointer, as part of ~user_bins. In chopper build, the given arguments are similar.
+    // problem is specifically in destructing filename_position_to_ibf_bin of the user bin class, die ik heb gemaakt .
     }
        return;
 }
