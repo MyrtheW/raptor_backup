@@ -8,7 +8,6 @@
 #include <chopper/layout/execute.hpp>
 #include <chopper/count/execute.hpp>
 #include <chopper/set_up_parser.hpp>
-#include <seqan3/test/tmp_filename.hpp>
 #include <raptor/update/rebuild.hpp>
 
 #include <raptor/build/hibf/chopper_build.hpp>
@@ -146,7 +145,7 @@ std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple, //rename 
                raptor_index<index_structure::hibf> & index,
                int number_of_splits)
 {
-    std::vector<uint64_t> tb_idxs;
+    std::vector<uint64_t> tb_idxs(number_of_splits); // ENRICO: size was 0
     index.ibf().delete_tbs(std::get<0>(index_tuple), std::get<1>(index_tuple));    // Empty the merged bin.
 
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level to serve as new merged bins.
@@ -174,13 +173,16 @@ std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split( //ren
     size_t cumulative_sum = 0; size_t filename_idx = 0; size_t split_idx =0;
     std::vector<std::vector<std::tuple<size_t, std::string>>> split_filenames;
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level to serve as new merged bins.
-        while (cumulative_sum < percentile*(split+1) or filename_idx >= kmer_counts_filenames.size()){
+        while (cumulative_sum < percentile*(split+1) && filename_idx < kmer_counts_filenames.size()){ // ENRICO: Not sure if && is correct.
             cumulative_sum += std::get<0>(kmer_counts_filenames[filename_idx]);
             filename_idx += 1;
         }
+        // create a new vector with filename indices.
+        // ENRICO: std::ranges::next(iterator, number, bound) is the same as iterator + number, but bound is a bound
+        // kmer_counts_filenames.begin() + filename_idx + 1 might be past the end
         split_filenames.push_back(std::vector(
-            kmer_counts_filenames.begin() + split_idx,
-            kmer_counts_filenames.begin() + filename_idx + 1)); // create a new vector with filename indices.
+            std::ranges::next(kmer_counts_filenames.begin(), split_idx, kmer_counts_filenames.end()),
+            std::ranges::next(kmer_counts_filenames.begin(), filename_idx + 1, kmer_counts_filenames.end())));
         split_idx = filename_idx;
     }
     return split_filenames;
@@ -195,16 +197,20 @@ std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split( //ren
  * \return[out]
  * \author Myrthe
  */
-std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_structure::hibf> & index,
-                                                             std::set<std::string> filenames){
+std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_structure::hibf> const & index,
+                                                             std::set<std::string> const & filenames)
+{
     std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames{};
-    for (std::string const & filename : filenames){
-        if (std::filesystem::path(filename).extension() !=".empty_bin"){
-            int kmer_count = index.ibf().get_occupancy_file(const_cast<std::string &>(filename));
+    for (std::string const & filename : filenames)
+    {
+        // ENRICO; construct filename_as_path such that it can be used for comparison without going out of scope
+        if (std::filesystem::path filename_as_path{filename}; filename_as_path.extension() != ".empty_bin")
+        {
+            int const kmer_count = index.ibf().get_occupancy_file(filename);
             kmer_counts_filenames.push_back(std::make_tuple(kmer_count, filename));
         }
     }
-    sort(kmer_counts_filenames.begin(), kmer_counts_filenames.end());
+    std::ranges::sort(kmer_counts_filenames);
     return kmer_counts_filenames; // array of tuples with filename and k-mer count, sorted by kmer count.
 }
 
@@ -320,6 +326,8 @@ template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_
 
 /*!\brief Prunes subtree from the original HIBF
  * \details One should remove the IBFs in the original index which were part of the subtree that had to be rebuild.
+ * TODO; originally indices_map "Create a map that maps remaining IBF indices of the original HIBF to their original indices", but I think it should be:
+ * `indices_map` is used to map IBF indices of the original HIBF to those in the new HIBF. If the IBF at an old index is not in the new HIBF, it will return -1.
  * If using some sort of splitting, then removing only needs to happen once since both new subindexes share the same original ibfs.
  * \param[in|out] index the original HIBF
  * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed, including the ibf_idx itself.
@@ -330,10 +338,11 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     // Store which original indices in the IBF were the subindex that had to be rebuild?
     std::unordered_set<size_t> indices_to_remove = index.ibf().ibf_indices_childeren(ibf_idx);  // Create a map that maps remaining IBF indices of the original HIBF to their original indices
     indices_to_remove.insert(ibf_idx);
-    std::vector<int> indices_map; int counter = 0;// Initialize the result vector
+    std::vector<int> indices_map; indices_map.resize(index.ibf().ibf_vector.size()); std::ranges::fill(indices_map, -1);
+    int counter = 0;// Initialize the result vector
     for (int i = 1; i <= index.ibf().ibf_vector.size(); i++) {
         if (indices_to_remove.find(i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
-            indices_map.push_back(counter); // Add it to the result vector, such that indices_map[i] = counter
+            indices_map[i] = counter; // Add it to the result vector, such that indices_map[i] = counter. Do not use .push_back, because that will make the list not long enough
             counter += 1;
         }
     };
@@ -349,6 +358,9 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     for (size_t ibf_idx{0}; ibf_idx < index.ibf().next_ibf_id.size(); ibf_idx++) {
         for (size_t i{0}; i < index.ibf().next_ibf_id[ibf_idx].size(); ++i){
             auto & next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][i];
+            assert(static_cast<size_t>(next_ibf_idx) < indices_map.size()); // ENRICO: this fails
+            // I understand most of your (Enrico's) comments. With a proper index on which no update operations had been performed the assert in hibf.hpp
+            // doesn't fail. However, what is this for?
             next_ibf_idx = indices_map[next_ibf_idx];
         }
     }

@@ -24,9 +24,8 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
 
 void call_layout(chopper::configuration & arguments);
 
-std::vector<std::tuple<size_t, std::string>> get_kmer_counts(
-        raptor_index<index_structure::hibf> & index,
-        std::set<std::string> filenames);
+std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_structure::hibf> const & index,
+                                                             std::set<std::string> const & filenames);
 
 void write_kmer_counts(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
                        std::filesystem::path count_filename);

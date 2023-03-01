@@ -339,7 +339,8 @@ public:
      * \return occupancy_per_file, the number of k-mers that the UB contains.
     * \author Myrthe Willemsen
     */
-    int get_occupancy_file(std::string & filename){
+    int get_occupancy_file(std::string const & filename) const
+    {
         std::tuple <uint64_t, uint64_t, uint16_t> index_triple = user_bins.find_filename(filename);
         size_t const ibf_idx = std::get<0>(index_triple);
         size_t const bin_idx = std::get<1>(index_triple);
@@ -515,24 +516,35 @@ public:
     //!\brief Creates //TODO
     void initialize_filename_position_to_ibf_bin()
     {
-        filename_position_to_ibf_bin.resize(user_bin_filenames.size()); // User bins should
-        std::fill(filename_position_to_ibf_bin.begin(), filename_position_to_ibf_bin.end(), std::make_tuple(0,0,0));
-        for (uint64_t idx=0; idx < user_bin_filenames.size(); idx++){ // warning: comparison of integer expressions of different signedness: solve this by declaring idx as size_t ipv int ?  â€˜intâ€™ and â€˜std::vector<std::__cxx11::basic_string<char> >::size_typeâ€™ {aka â€˜long unsigned intâ€™} [-Wsign-compare]
-            std::string filename = user_bin_filenames[idx];             // Question: create string view from filename?
-            filename_to_idx.emplace(filename, idx);
-        } // or something similar to parse_user_bin_ids
+        filename_position_to_ibf_bin.resize(user_bin_filenames.size());
+        std::ranges::fill(filename_position_to_ibf_bin, std::make_tuple(0u, 0u, 0u));
 
-        for (uint64_t ibf_idx=0; ibf_idx < ibf_bin_to_filename_position.size(); ibf_idx++){ // or should this be uint64_t instead of size_t, here and in the following.
-            for (uint64_t bin_idx=0; bin_idx < ibf_bin_to_filename_position[ibf_idx].size(); bin_idx++){
-                int64_t filename_position = ibf_bin_to_filename_position[ibf_idx][bin_idx]; // Question: should I use references here?
-                if (std::get<2>(filename_position_to_ibf_bin[filename_position])){ //for split bins.
-                    ++std::get<2>(filename_position_to_ibf_bin[filename_position]);
-                }else{
-                    filename_position_to_ibf_bin[filename_position] = std::make_tuple(ibf_idx, bin_idx, 1); // as a user bin can take up multiple bins, this should consist of multiple bin_idx or multiple tuples.
-                }
-            }
+        for (size_t idx{}; idx < user_bin_filenames.size(); ++idx)
+        {
+            std::string_view filename = user_bin_filenames[idx];
+            filename_to_idx.emplace(filename, idx);
         }
 
+        for (size_t ibf_idx{}; ibf_idx < ibf_bin_to_filename_position.size(); ++ibf_idx)
+        {
+            auto const & ibf_data = ibf_bin_to_filename_position[ibf_idx];
+
+            for (size_t bin_idx{}; bin_idx < ibf_data.size(); ++bin_idx)
+            {
+                int64_t const filename_position = ibf_data[bin_idx];
+                // ENRICO: How do you want to handle -1?
+                if (filename_position == -1) // merged bin
+                    continue;
+                assert(filename_position >= 0);
+                assert(static_cast<size_t>(filename_position) < filename_position_to_ibf_bin.size());
+
+                auto & ibf_bin = filename_position_to_ibf_bin[filename_position];
+                if (std::get<2>(ibf_bin)) // split bin
+                    ++std::get<2>(ibf_bin);
+                else // as a user bin can take multiple bins, this should consist of multiple bin_idx or multiple tuples
+                    ibf_bin = std::make_tuple(ibf_idx, bin_idx, 1u);
+            }
+        }
     }
 
     //when resizing the ibf.
@@ -546,9 +558,9 @@ public:
      * Should only be used when filename_position_to_ibf_bin has been created, and after checking the filename is present in the filename_to_idx map
      * \author Myrthe
      */
-    std::tuple <uint64_t, uint64_t, uint16_t> find_filename(std::string filename)
+    std::tuple<uint64_t, uint64_t, uint16_t> find_filename(std::string const & filename) const
     {
-        return filename_position_to_ibf_bin[filename_to_idx[filename]];
+        return filename_position_to_ibf_bin[filename_to_idx.at(filename)];
     }
 
     /*!\brief Checks if the filename is already present in the HIBF.

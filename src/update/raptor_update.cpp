@@ -29,7 +29,7 @@ void raptor_update(update_arguments const & arguments)
 
         std::tuple<size_t,size_t> index_tuple = std::make_tuple(0, 14);
         partial_rebuild(index_tuple, index, arguments);
-
+        // TODO after rebuilding, the '            assert(current_filename_index < 0);' becomes false in hibf.hpp
         if //constexpr
         (not arguments.compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
             if (arguments.insert_ubs==true){
