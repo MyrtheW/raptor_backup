@@ -25,7 +25,7 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
                                                        raptor_index<index_structure::hibf> & index){
     size_t root_idx = 0;
     size_t ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
-    // TODO: change to some input argument, to decide which function to use.
+    // TODO: change to some input argument, to decide which function to use.  if function_find_ibf == "find_ibf_idx_traverse_by_similarity"
     //size_t ibf_idx = find_ibf_idx_ibf_size(kmers.size(, index); // OR OTHER FIND LOCATION ALGORITHM
     //size_t ibf_idx = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // OR OTHER FIND LOCATION ALGORITHM
     size_t number_of_bins = 1; // calculate number of user bins needed.
@@ -305,7 +305,8 @@ size_t find_ibf_idx_ibf_size(size_t & kmer_count, raptor_index<index_structure::
      * \details the merged bin with the maximal similarity is selected.
      * The algorithm recurses until an IBF's bin size is too small to accommodate the new UB.
      * The similarities to all TBs in each traversed IBF are approximated by querying a percentage of the k-mers from the new UBs.
-     * This can be efficiently done using the query method that is already in place.
+     * This can be efficiently done using the query me
+     * thod that is already in place.
      * \author Myrthe Willemsen
      */
 size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t> & kmers, raptor_index<index_structure::hibf> & index, size_t ibf_idx){ //default is root_idx =0, where we start the search.
@@ -339,6 +340,6 @@ size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t
 
 
 
-
+// TODO : use update_filename_indices?
 
 } // end namespace

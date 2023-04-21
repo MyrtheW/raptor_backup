@@ -47,13 +47,12 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     // initialize lower level IBF
     size_t const max_bin_tbs =
     initialise_max_bin_kmers(kmers, ibf_positions, filename_indices, current_node, data, arguments, empty_bin_kmers);
-    auto lower_ibf_idx = ibf_positions[data.node_map[current_node].max_bin_index];
+    //auto lower_ibf_idx = ibf_positions[data.node_map[current_node].max_bin_index]; --> unused variable
     auto && ibf = construct_ibf(kmers, max_bin_tbs, current_node, data, arguments, empty_bin_kmers);
     data.hibf.occupancy_table[ibf_pos].resize(ibf.bin_count());
     data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count()); // Update the FPR and occupancy table for the dynamic HIBF.
     data.hibf.ibf_vector[ibf_pos] = ibf;// This is required for updating the fpr table during insert_into_ibf.
-    //insert_into_ibf(parent_kmers, kmers, max_bin_tbs, data.node_map[current_node].max_bin_index, ibf, is_root); // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
-    insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, data.node_map[current_node].max_bin_index,
+    insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, data.node_map[current_node].max_bin_index, // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
                             (uint64_t) max_bin_tbs), data.hibf, ibf, is_root); // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
     kmers.clear(); // reduce memory peak
 

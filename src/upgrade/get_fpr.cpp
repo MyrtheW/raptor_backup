@@ -2,6 +2,9 @@
 #include <raptor/build/hibf/compute_kmers.hpp>
 #include <raptor/build/hibf/insert_into_ibf.hpp>
 //#include <algorithm> // for std::max
+// THIS FILE IS OLD!!!
+// CAN BE DELETED
+
 
 namespace raptor
 {

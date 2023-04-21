@@ -172,20 +172,17 @@ public:
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
         auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
-        if (next_ibf_id[ibf_idx][bin_idx]!=ibf_idx){
+        if (next_ibf_id[ibf_idx][bin_idx]!=ibf_idx and next_ibf_id[ibf_idx][bin_idx]!=-1){
             assert(current_filename_index < 0);
             return true;
         }else{ return false;}
     }
 
-    /*!\brief Returns if a TB is a merged bin.
-     * \details If the filename index is smaller than 0, i.e. undefined, it means that the TB is MB.
-     * Alternative to current implementation: use next_ibf_id: assume we look up a bin `b` in IBF `i`, i.e. `next_ibf_id[i][b]`. If `i` is returned, there is no lower level IBF, bin `b` is hence not a merged bin.
-     * \param[in]
+    /*!\brief Returns the number of bins a TB is split into
+     * \param[in] ibf_idx
+     * \param[in] bin_idx
      * \author Myrthe Willemsen
     */
-        // add function to hierarchical_i_b_f.hpp:. returns number of bins.
-        // this is not the fastest implementation.
     size_t is_split_bin(size_t ibf_idx, size_t bin_idx){
         size_t number_of_bins = 1;
         if (not is_merged_bin(ibf_idx, bin_idx)){ // the function assumes that only leaf bins can be split.
@@ -201,12 +198,13 @@ public:
      * \author Myrthe Willemsen
     */
     void delete_tbs(size_t ibf_idx, size_t bin_idx, size_t number_of_bins=1){
-        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
+        auto& ibf = ibf_vector[ibf_idx]; // select the IBF
         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table.
-            seqan3::bin_index const bin_index{bin_idx + offset}; // TODO CHECK: if this works. auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin // ibf.clear((seqan3::bin_index const) bin_idx);
+            seqan3::bin_index const bin_index{bin_idx + offset};
             ibf.clear(bin_index);
             fpr_table[ibf_idx][bin_idx+offset] = 0;
             occupancy_table[ibf_idx][bin_idx+offset] = 0;
+            next_ibf_id[ibf_idx][bin_idx+offset] = -1;
         }
     }
 
@@ -235,11 +233,11 @@ public:
      * \return child_indices
     * \author Myrthe Willemsen
     */
-    std::unordered_set<size_t> ibf_indices_childeren(size_t ibf_idx, std::unordered_set<size_t> child_indices = {}){
+    std::vector<size_t> ibf_indices_childeren(size_t ibf_idx, std::vector<size_t> child_indices = {}){
         for (size_t bin_idx=0; bin_idx < next_ibf_id[ibf_idx].size(); ++bin_idx){
             if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
                 auto ibf_idx_mb = next_ibf_id[ibf_idx][bin_idx];
-                child_indices.insert(ibf_idx);
+                child_indices.push_back(ibf_idx);
                 ibf_indices_childeren(ibf_idx_mb, child_indices);
             }
         }
@@ -513,12 +511,12 @@ public:
     std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};
 
 
-    //!\brief Creates //TODO
+    //!\brief Creates //TODO doc
     void initialize_filename_position_to_ibf_bin()
     {
         filename_position_to_ibf_bin.resize(user_bin_filenames.size());
         std::ranges::fill(filename_position_to_ibf_bin, std::make_tuple(0u, 0u, 0u));
-
+        filename_to_idx.clear();
         for (size_t idx{}; idx < user_bin_filenames.size(); ++idx)
         {
             std::string_view filename = user_bin_filenames[idx];
@@ -532,7 +530,6 @@ public:
             for (size_t bin_idx{}; bin_idx < ibf_data.size(); ++bin_idx)
             {
                 int64_t const filename_position = ibf_data[bin_idx];
-                // ENRICO: How do you want to handle -1?
                 if (filename_position == -1) // merged bin
                     continue;
                 assert(filename_position >= 0);
@@ -574,14 +571,18 @@ public:
         return true; // filename/user bin does already exist in HIBF
     }
 
-    /*!\brief TODO
+    /*!\brief update the filename datastructures with a new filename, e.g. when a new user bin has been added  TODO
+     * \param [in] filename
+     * \param [in] filename
+     * \param [in] filename
+     * \param [in] filename
+
      * \author Myrthe Willemsen
      */
     void update_filename_indices(std::string & filename, size_t const ibf_idx,
                                  size_t const bin_idx, size_t const number_of_bins){
         user_bin_filenames.push_back(filename); // or resize it first to add filename to the end of "filenames"
         filename_to_idx[filename] = user_bin_filenames.size(); // We should not assume filename_to_idx has the same size as user_bin_filenames, but as we do not remove deleted bins from 'user_bin_filenames' nor from 'filename_position_to_ibf_bin', we should use user_bin_filenames.size()
-        // for index_pair in index_pairs:
         filename_position_to_ibf_bin[user_bin_filenames.size()] = std::make_tuple(ibf_idx, bin_idx, number_of_bins); // or resize it first?
         ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ; // possibly resize to update ibf_bin_to_filename_position and filenames
     }

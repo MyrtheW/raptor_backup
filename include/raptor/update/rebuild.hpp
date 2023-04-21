@@ -52,7 +52,8 @@ build_arguments build_config(std::string subtree_bin_paths,
 
 template <seqan3::data_layout data_layout_mode>
 robin_hood::unordered_flat_set<size_t> call_build(build_arguments & arguments,
-                raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index);
+                raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> & index,
+                bool is_root = false);
 
 template <typename T> void remove_indices(std::unordered_set<size_t> indices_to_remove, std::vector<T> & vector);
 
