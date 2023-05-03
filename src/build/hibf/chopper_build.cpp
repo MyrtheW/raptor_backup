@@ -26,7 +26,8 @@ void chopper_build(build_arguments const & arguments)
 
     std::vector<std::vector<std::string>> bin_path{};
     for (size_t i{0}; i < data.hibf.user_bins.num_user_bins(); ++i)
-        bin_path.push_back(std::vector<std::string>{data.hibf.user_bins.filename_of_user_bin(i)});
+        bin_path.push_back(std::vector<std::string>{data.hibf.user_bins.filename_of_user_bin(i)}); // TODO myrthe: Make sure that empty bins are not added at this point.
+        // this can also be done in read_chopper_pack_file.cpp . In create_ibfs_from_chopper_pack tmax is calculated
 
     raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> index{window{arguments.window_size},
                                                                                 arguments.shape,

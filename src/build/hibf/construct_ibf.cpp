@@ -42,7 +42,7 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
     if (node_data.favourite_child == lemon::INVALID // not a merged bin
     and std::filesystem::path(record.filenames[0]).extension() ==".empty_bin"){ // we are dealing with an empty bin
         std::string kmer_count = (std::string) std::filesystem::path(record.filenames[0]).stem(); // the empty bin's intended size will be extracted from the filename
-        double kmer_count_double = ::atof(kmer_count.c_str());
+        double kmer_count_double = ::atof(kmer_count.c_str()); // TODO, perhaps it would be better to take the size from the next UB, to ensure that it is not larger than the HLL size estimate, which could cause ver unnesessary rebuilding.
         empty_bin_kmers += static_cast<size_t>(kmer_count_double); // the empty bin's size is added to `empty_bin_kmers`, which is to be passed on to the parent merged bins of the empty bin.
         kmers_per_bin = static_cast<size_t>(std::ceil(static_cast<double>(kmer_count_double / number_of_bins))); // For the construction of the IBF we need to calculate the length of a single bloom filter (bin size), by dividing the number of kmers of the UB by the number of bins among which it will be stored.
     }else{

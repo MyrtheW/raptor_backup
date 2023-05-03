@@ -8,6 +8,7 @@
 #pragma once
 
 #include <ranges>
+#include <unordered_map>
 
 #include <seqan3/search/dream_index/interleaved_bloom_filter.hpp>
 #include <cereal/types/tuple.hpp>
@@ -141,6 +142,9 @@ public:
     //!\brief Maximum false positive rate for any user bin.
     double fpr_max;
 
+    //!\brief Maximum number of bins of an IBF.
+    double t_max;
+
     //!\brief Maximum (or optimal) number of k-mers (bin counts) that IBF could hold at that moment. The vector contains tuples of (ibf_size, ibf_idx), sorted by ibf size.
     std::vector<std::tuple<size_t, size_t>> ibf_sizes;
 
@@ -167,12 +171,13 @@ public:
     /*!\brief Returns if a TB is a merged bin.
      * \details If the filename index is smaller than 0, i.e. undefined, it means that the TB is MB.
      * Alternative to current implementation: use next_ibf_id: assume we look up a bin `b` in IBF `i`, i.e. `next_ibf_id[i][b]`. If `i` is returned, there is no lower level IBF, bin `b` is hence not a merged bin.
-     * \param[in]
-    * \author Myrthe Willemsen
+     * \param[in] ibf_idx
+     * \param[in] bin_idx
+     * \author Myrthe Willemsen
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
         auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
-        if (next_ibf_id[ibf_idx][bin_idx]!=ibf_idx and next_ibf_id[ibf_idx][bin_idx]!=-1){
+        if (next_ibf_id[ibf_idx][bin_idx] != (int64_t) ibf_idx and next_ibf_id[ibf_idx][bin_idx] != -1){
             assert(current_filename_index < 0);
             return true;
         }else{ return false;}
@@ -282,7 +287,7 @@ public:
     }
 
     double approximate_fpr(int m, int n, int h, int s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
-        return (1-pow(1 - approximate_fpr(m,n,h), s)); // - deleted_kmers/(alphabet**k)
+        return (1-pow(1 - approximate_fpr(m,(int) n/s,h), s)); // - deleted_kmers/(alphabet**k)
     }
 
 
@@ -416,7 +421,8 @@ public:
     }
 
     /*!\brief Calculates the number of TBs needed to store a UB in a specific IBF.
-     * \details Given an IBF, with a certain bin size, how many technical bins (TBs) are needed to store a certain number of kmers, considering the multiple testing problem?
+     * \details Given an IBF, with a certain bin size, how many technical bins (TBs) are needed to store a certain
+     * number of kmers, considering the multiple testing problem?
      * \param[in] ibf_idx index of IBF in HIBF
      * \param[in] kmer_count the number of k-mers that the UB contains.
      * \return number_of_bins, the number of TBs needed to store the UB.
@@ -426,11 +432,13 @@ public:
         auto& ibf = ibf_vector[ibf_idx]; // select the IBF
         int bin_size = ibf.bin_size();
         int hash_funs = ibf.hash_function_count();
-        int number_of_bins = std::ceil( kmer_count / ibf_max_kmers(ibf_idx)); // first guess
+        int number_of_bins = std::ceil(kmer_count / ibf_max_kmers(ibf_idx)); // first guess without accounting for multiple testing correction
         while (approximate_fpr(bin_size, (int) kmer_count, hash_funs, number_of_bins) > fpr_max){
             number_of_bins++;
         }
-        return number_of_bins;
+        assert(number_of_bins);
+
+        return (size_t) number_of_bins;
     }
 
 
@@ -497,10 +505,9 @@ public:
     std::unordered_map<std::string, uint64_t> filename_to_idx;
 
     /*!\brief Stores for each filename ID each of its bins and corresponding IBF in the HIBF
-     * \details //TODO DOC
-     * .
+     * \details The `filename_index` is mapped to a triple (ibf_idx, bin_idx, number_of_bins)
      */
-    std::vector<std::tuple<uint64_t, uint64_t, uint16_t>> filename_position_to_ibf_bin{}; // filename index --> (ibf_idx, bin_idx, number_of_bins)
+    std::vector<std::tuple<uint64_t, uint64_t, uint16_t>> filename_position_to_ibf_bin{};
 
     /*!\brief Stores for each bin in each IBF of the HIBF the ID of the filename.
      * \details
@@ -510,16 +517,19 @@ public:
      */
     std::vector<std::vector<int64_t>> ibf_bin_to_filename_position{};
 
-
-    //!\brief Creates //TODO doc
+    /*!\brief Initiliazes several of the filename datastructures
+     * \details Repopulates the `filename_to_idx` and `filename_position_to_ibf_bin` using the \
+     * other datastructures `ibf_bin_to_filename_position` and the `user_bin_filenames` vector
+     * \author Myrthe Willemsen
+     */
     void initialize_filename_position_to_ibf_bin()
     {
         filename_position_to_ibf_bin.resize(user_bin_filenames.size());
         std::ranges::fill(filename_position_to_ibf_bin, std::make_tuple(0u, 0u, 0u));
-        filename_to_idx.clear();
-        for (size_t idx{}; idx < user_bin_filenames.size(); ++idx)
+        filename_to_idx.clear(); // clear the content of `filename_to_idx`
+        for (size_t idx{}; idx < user_bin_filenames.size(); ++idx) // repopulate `filename_to_idx` by traversing over the `user_bin_filenames` vector
         {
-            std::string_view filename = user_bin_filenames[idx];
+            std::string filename = user_bin_filenames[idx];
             filename_to_idx.emplace(filename, idx);
         }
 
@@ -544,7 +554,7 @@ public:
         }
     }
 
-    //when resizing the ibf.
+     //!\brief resizes an `ibf_filename_positions` vector when resizing an IBF.
     void resize_ibf_filename_positions(size_t ibf_idx, size_t new_bin_count){
         assert(new_bin_count >= ibf_bin_to_filename_position[ibf_idx].size()); // assert that new bin count is larger then the size.
         ibf_bin_to_filename_position[ibf_idx].resize(new_bin_count);
@@ -553,7 +563,7 @@ public:
     /*!\brief Returns the bin and IBF indices within the HIBF of a given user bin, specified by filename.
      * \details
      * Should only be used when filename_position_to_ibf_bin has been created, and after checking the filename is present in the filename_to_idx map
-     * \author Myrthe
+     * \author Myrthe Willemsen
      */
     std::tuple<uint64_t, uint64_t, uint16_t> find_filename(std::string const & filename) const
     {
@@ -573,18 +583,17 @@ public:
 
     /*!\brief update the filename datastructures with a new filename, e.g. when a new user bin has been added  TODO
      * \param [in] filename
-     * \param [in] filename
-     * \param [in] filename
-     * \param [in] filename
-
+     * \param [in] index_triple
      * \author Myrthe Willemsen
      */
-    void update_filename_indices(std::string & filename, size_t const ibf_idx,
-                                 size_t const bin_idx, size_t const number_of_bins){
-        user_bin_filenames.push_back(filename); // or resize it first to add filename to the end of "filenames"
-        filename_to_idx[filename] = user_bin_filenames.size(); // We should not assume filename_to_idx has the same size as user_bin_filenames, but as we do not remove deleted bins from 'user_bin_filenames' nor from 'filename_position_to_ibf_bin', we should use user_bin_filenames.size()
-        filename_position_to_ibf_bin[user_bin_filenames.size()] = std::make_tuple(ibf_idx, bin_idx, number_of_bins); // or resize it first?
-        ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ; // possibly resize to update ibf_bin_to_filename_position and filenames
+    void update_filename_indices(std::string const & filename, std::tuple <uint64_t, uint64_t, uint16_t> & index_triple){
+        size_t const ibf_idx = std::get<0>(index_triple);
+        size_t const bin_idx = std::get<1>(index_triple);
+        size_t const number_of_bins = std::get<2>(index_triple);
+        filename_position_to_ibf_bin.emplace_back(ibf_idx, bin_idx, number_of_bins);
+        ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ;
+        filename_to_idx.emplace(filename, user_bin_filenames.size());
+        user_bin_filenames.push_back(filename); // make sure this is after the previous methods, such that they refer to the correct idnex.
     }
 
     /*!\brief Deletes a filename from the user bin datastructures
@@ -594,7 +603,7 @@ public:
      * \author Myrthe Willemsen
      */
     void delete_filename(const std::string & filename){
-        user_bin_filenames[filename_to_idx[filename]] ="x.empty_bin"; // One could put the original cardinality or ibf size instead of x, although this does not provide any added value at the moment.
+        user_bin_filenames[filename_to_idx.at(filename)] ="x.empty_bin"; // One could put the original cardinality or ibf size instead of x, although this does not provide any added value at the moment.
         filename_to_idx.erase(filename);
     }
 

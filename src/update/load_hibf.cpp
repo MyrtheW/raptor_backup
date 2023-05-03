@@ -13,13 +13,13 @@ namespace raptor
  * \remark does not yet work for compressed indexes.
  * \param[out] index the HIBF
  * \param[in] update_arguments configuration object with parameters required for calling an update operation
- * \author Myrthe
+ * \author Myrthe Willemsen
  */
 void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments const & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
 {   if (not arguments.compressed){
     double index_io_time{0.0};
     load_index(index, arguments, index_io_time); // add: arguments.parts - 1, if HIBF consists of multiple
-    // prepare index to allow for updates
+    // prepare index to allow for updates TODO remove this, such that it is only done during building
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin();
     index.ibf().initialize_previous_ibf_id(); //
     index.ibf().initialize_ibf_sizes();

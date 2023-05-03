@@ -20,7 +20,8 @@ namespace raptor
 //void split_ibf(size_t ibf_idx,
 //                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
-                                      update_arguments const & arguments);
+                                      update_arguments const & arguments,
+                                      std::string file_indicator="");
 
 void call_layout(chopper::configuration & arguments);
 
@@ -36,13 +37,17 @@ std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple,
 
 std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split(
         std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
-        size_t number_of_splits=2);
+        int number_of_splits = 2);
 
 
 void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                      raptor_index<index_structure::hibf> & index,
                      update_arguments const & arguments,
-                     int number_of_splits= 2);
+                     int number_of_splits = 2);
+
+
+void full_rebuild(raptor_index<index_structure::hibf> & index,
+                  update_arguments const & update_arguments);
 
 void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames);
 

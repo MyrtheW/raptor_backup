@@ -22,15 +22,13 @@ namespace raptor
  * \author Myrthe Willemsen
  */
 void raptor_update(update_arguments const & arguments)
-{    if (arguments.is_hibf) // and not arguments.compressed remove arguments.compressed later, when decompressing is effective.
+{   if (arguments.is_hibf) // and not arguments.compressed remove arguments.compressed later, when decompressing is effective.
     {
         auto index = raptor_index<index_structure::hibf>{}; // Does not do anything with arguments? Strangely seems only done in store_index.
         load_hibf(index, arguments);
 
-        std::tuple<size_t,size_t> index_tuple = std::make_tuple(0, 14);
-        partial_rebuild(index_tuple, index, arguments);
         if //constexpr
-        (not arguments.compressed){ // should be constexpr, otherwise it will try for all vlaues of compressed
+        (not arguments.compressed){ // should be constexpr, otherwise it will try for all values of compressed
             if (arguments.insert_ubs==true){
                 insert_ubs(arguments, index); // this function requires the uncompressed index type
             }else if(arguments.insert_sequences==true){
@@ -47,7 +45,7 @@ void raptor_update(update_arguments const & arguments)
     // if arguments.compressed, it should be compressed again
     store_index(arguments.out_file, index, arguments);
     }
-       return;
+    return;
 }
 
 } // namespace raptor

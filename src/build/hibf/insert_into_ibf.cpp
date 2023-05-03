@@ -150,7 +150,7 @@ namespace raptor{
  * \param[in] kmers The kmers to be inserted.
  * \param[in] index_triple consisting of the ibf_idx, start_bin_idx and number_of_bins.
  * \param[in] index The HIBF.
- * \param[in] rebuild_index_tuple A tuple of the index of IBF and TB that need to be rebuild.
+ * \param[out] rebuild_index_tuple A tuple of the index of IBF and TB that need to be rebuild.
  * If the current TB reaches the FPR_max, it will be equal to the input value (when using the layout-rebuild method)
  * \attention This function is only available for **uncompressed** Interleaved Bloom Filters.
  * \author Myrthe Willemsen
@@ -166,6 +166,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);
     auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[]
+    assert(number_of_bins);
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 
@@ -176,7 +177,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
         ++chunk_number;
         for (size_t const value : chunk)
         {
-            auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; //  seqan3::bin_index const bin_idx{bin
+            auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; // Convert the bin_idx to the type seqan3::bin_index
             union_count += ibf.emplace_exists(value, bin_index); // Union count value will remain 0 if inserted in an empty bin.
         }
     }
@@ -185,7 +186,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
     index.ibf().update_occupancy_table(kmers.size()-union_count, ibf_idx, start_bin_idx, number_of_bins);
     auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
     if (fpr > index.ibf().fpr_max){
-        assert(index.ibf().next_ibf_id[ibf_idx][start_bin_idx] != ibf_idx); //assert that fpr should not reach fpr max for the leaf bin ibf, because we search a location such that it is 'feasible', i.e. binsize should be sufficient to accomodate new UB.
+        assert(index.ibf().next_ibf_id[ibf_idx][start_bin_idx] != ibf_idx); //assert that it is not a leaf bin. fpr should not reach fpr max for the leaf bin ibf, because we search a location such that it is 'feasible', i.e. binsize should be sufficient to accomodate new UB.
         rebuild_index_tuple = std::make_tuple(ibf_idx, start_bin_idx);
     }
 }
